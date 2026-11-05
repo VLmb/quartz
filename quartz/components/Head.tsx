@@ -58,7 +58,7 @@ export default (() => {
           </>
         )}
         <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossOrigin="anonymous" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
         <meta name="og:site_name" content={cfg.pageTitle}></meta>
         <meta property="og:title" content={title} />
@@ -90,6 +90,22 @@ export default (() => {
         )}
 
         <link rel="icon" href={iconPath} />
+        {/* PWA: манифест, цвета системной панели, иконка для iOS */}
+        <link
+          rel="manifest"
+          href={joinSegments(baseDir, "manifest.webmanifest")}
+          crossOrigin="use-credentials"
+        />
+        <meta name="theme-color" content="#efefec" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#0e1110" media="(prefers-color-scheme: dark)" />
+        <link
+          rel="apple-touch-icon"
+          href={joinSegments(baseDir, "static/pwa/apple-touch-icon.png")}
+        />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content={cfg.pageTitle} />
         <meta name="description" content={description} />
         <meta name="generator" content="Quartz" />
 

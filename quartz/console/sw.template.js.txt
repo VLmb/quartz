@@ -1,0 +1,142 @@
+// Service worker базы знаний (генерируется при сборке, версия меняется на каждый деплой).
+// Страницы: сначала сеть, без сети — сохранённая копия. Стили, скрипты, шрифты: из кеша.
+// При установке скачивает все заметки, чтобы их можно было читать офлайн.
+const VERSION = "__VERSION__"
+const CACHE = `kb-${VERSION}`
+const RUNTIME = "kb-runtime"
+const BASE = new URL("./", self.location).href
+
+const isAsset = (url) => /\.(css|js|woff2?|png|jpe?g|gif|webp|avif|svg|ico|webmanifest)$/i.test(url.pathname)
+const isPage = (req, url) =>
+  req.mode === "navigate" || (req.headers.get("accept") || "").includes("text/html") || !/\.[a-z0-9]+$/i.test(url.pathname)
+
+async function precache() {
+  const cache = await caches.open(CACHE)
+  const res = await fetch(BASE, { cache: "reload", credentials: "same-origin" })
+  if (!res.ok) return
+  const html = await res.clone().text()
+  await cache.put(BASE, res)
+  const urls = new Set()
+  for (const m of html.matchAll(/(?:href|src)="([^"#]+)"/g)) {
+    const u = new URL(m[1], BASE)
+    if (u.origin === self.location.origin && isAsset(u)) urls.add(u.href)
+  }
+  for (const f of [
+    "JetBrainsMono-normal-cyrillic",
+    "JetBrainsMono-normal-latin",
+    "JetBrainsMono-italic-cyrillic",
+    "JetBrainsMono-italic-latin",
+    "Onest-normal-cyrillic",
+    "Onest-normal-latin",
+  ])
+    urls.add(new URL(`static/fonts/${f}.woff2`, BASE).href)
+  try {
+    const idxUrl = new URL("static/contentIndex.json", BASE).href
+    const idx = await fetch(idxUrl, { cache: "reload" }).then((r) => r.json())
+    urls.add(idxUrl)
+    for (const slug of Object.keys(idx)) {
+      const path = slug === "index" ? "" : slug.endsWith("/index") ? slug.slice(0, -5) : slug
+      urls.add(new URL(path, BASE).href)
+    }
+  } catch (e) {}
+  // скрипты Quartz подгружают другие скрипты через import() — находим и их
+  for (const u of [...urls].filter((x) => x.endsWith(".js"))) {
+    try {
+      const js = await fetch(u).then((r) => r.text())
+      for (const m of js.matchAll(/["'`(]([.\/\w-]*static\/[\w.\/-]+\.(?:js|css))/g)) {
+        const v = new URL(m[1], u)
+        if (v.origin === self.location.origin) urls.add(v.href)
+      }
+    } catch (e) {}
+  }
+  const list = [...urls]
+  // по 8 запросов за раз, чтобы не душить сеть телефона
+  for (let i = 0; i < list.length; i += 8) {
+    await Promise.allSettled(
+      list.slice(i, i + 8).map(async (u) => {
+        const r = await fetch(u, { cache: "reload", credentials: "same-origin" })
+        if (r.ok) await cache.put(u, r)
+      }),
+    )
+  }
+}
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(precache().catch(() => {}))
+  self.skipWaiting()
+})
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      const keys = await caches.keys()
+      await Promise.all(keys.filter((k) => k !== CACHE && k !== RUNTIME).map((k) => caches.delete(k)))
+      await self.clients.claim()
+    })(),
+  )
+})
+
+async function networkFirst(req, timeoutMs) {
+  const cache = await caches.open(CACHE)
+  try {
+    const res = await Promise.race([
+      fetch(req),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), timeoutMs)),
+    ])
+    if (res && res.ok) cache.put(req, res.clone())
+    return res
+  } catch (e) {
+    const hit = (await caches.match(req, { ignoreSearch: true })) || (await caches.match(req.url.replace(/\/$/, "")))
+    if (hit) return hit
+    const home = await caches.match(BASE)
+    if (home && req.mode === "navigate") return home
+    return new Response("Нет сети, и эта страница ещё не сохранена.", {
+      status: 503,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    })
+  }
+}
+
+async function cacheFirst(req) {
+  const hit = await caches.match(req)
+  if (hit) return hit
+  const res = await fetch(req)
+  if (res.ok) (await caches.open(RUNTIME)).put(req, res.clone())
+  return res
+}
+
+// Картинки из заметок могут меняться под тем же именем: отдаём из кеша и тихо обновляем.
+async function staleWhileRevalidate(event, req) {
+  const cache = await caches.open(RUNTIME)
+  const hit = await caches.match(req)
+  const update = fetch(req)
+    .then((res) => {
+      if (res.ok) cache.put(req, res.clone())
+      return res
+    })
+    .catch(() => hit)
+  if (hit) {
+    event.waitUntil(update)
+    return hit
+  }
+  return update
+}
+
+const isImmutable = (url) => /-[0-9a-f]{8}\.(css|js)$/.test(url.pathname) || /\/static\/(fonts|pwa)\//.test(url.pathname)
+
+self.addEventListener("fetch", (event) => {
+  const req = event.request
+  if (req.method !== "GET") return
+  const url = new URL(req.url)
+  if (url.origin !== self.location.origin) return
+  if (url.pathname.endsWith("/sw.js")) return
+  if (url.pathname.endsWith("contentIndex.json")) {
+    event.respondWith(networkFirst(req, 4000))
+  } else if (isPage(req, url)) {
+    event.respondWith(networkFirst(req, 4000))
+  } else if (isImmutable(url)) {
+    event.respondWith(cacheFirst(req))
+  } else if (isAsset(url)) {
+    event.respondWith(staleWhileRevalidate(event, req))
+  }
+})

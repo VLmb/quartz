@@ -1,0 +1,30 @@
+# После изменений темы просит репозиторий knowledge пересобрать сайт.
+# Нужен секрет KNOWLEDGE_DISPATCH_TOKEN: fine-grained токен с доступом к VLmb/knowledge
+# (Repository permissions → Contents: Read and write). Без секрета шаг просто пропускается.
+name: Redeploy knowledge site
+
+on:
+  push:
+    branches: [v5]
+    paths:
+      - "quartz/**"
+      - "quartz.ts"
+      - "quartz.config.yaml"
+      - "package-lock.json"
+  workflow_dispatch:
+
+jobs:
+  dispatch:
+    if: ${{ github.repository != 'jackyzha0/quartz' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Запустить сборку в knowledge
+        env:
+          GH_TOKEN: ${{ secrets.KNOWLEDGE_DISPATCH_TOKEN }}
+          TARGET: ${{ vars.KNOWLEDGE_REPO || 'VLmb/knowledge' }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "Секрет KNOWLEDGE_DISPATCH_TOKEN не задан — пересоберите сайт вручную (Actions → Deploy site → Run workflow)."
+            exit 0
+          fi
+          gh api "repos/$TARGET/dispatches" -f event_type=quartz-updated
