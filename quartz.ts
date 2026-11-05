@@ -1,11 +1,20 @@
 import { loadQuartzConfig, loadQuartzLayout } from "./quartz/plugins/loader/config-loader"
 import { frameRegistry } from "./quartz/components/frames/registry"
 import { PageTypeDispatcher } from "./quartz/plugins/pageTypes/dispatcher"
-import ConsoleChrome, { ConsoleFrame, GitHistory, PWA, SvgEmbedFix } from "./quartz/console"
+import ConsoleChrome, {
+  ConsoleFrame,
+  EditorBundle,
+  GitHistory,
+  PWA,
+  SvgEmbedFix,
+  buildEditorBundle,
+} from "./quartz/console"
 
 // Тема в стиле Linear: свой каркас страницы, верхняя полоса (несёт стили и скрипты темы),
 // исправление SVG-вставок, история правок из git и PWA. Код темы — в quartz/console.
 frameRegistry.register("console", ConsoleFrame, "quartz/console")
+// редактор заметок — отдельный бандл, грузится по требованию
+await buildEditorBundle()
 
 const config = await loadQuartzConfig()
 
@@ -40,6 +49,6 @@ const dispatcherIdx = emitters.findIndex((e) => e.name === "PageTypeDispatcher")
 const dispatcher = PageTypeDispatcher(layout)
 if (dispatcherIdx >= 0) emitters[dispatcherIdx] = dispatcher
 else emitters.push(dispatcher)
-emitters.push(PWA())
+emitters.push(PWA(), EditorBundle())
 
 export default config

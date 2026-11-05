@@ -524,6 +524,121 @@ function setupReview() {
   }
 }
 
+/* ───────────── редактирование на сайте ───────────── */
+type Me = { login: string; name: string; avatar: string | null }
+type EditorModule = {
+  init: (h: { root: string; entries: () => Promise<Entry[]> }) => void
+  openEditor: (path: string) => Promise<void>
+  newNote: (folder?: string) => Promise<void>
+  onNav: () => void
+  isDirty: () => boolean
+  toast: (html: string, o?: { kind?: string; timeout?: number }) => unknown
+}
+let editorModule: EditorModule | null = null
+let editorLoading: Promise<EditorModule> | null = null
+
+function apiUrl(path: string): URL {
+  return new URL(`api/${path}`, rootUrl())
+}
+
+function loadEditor(): Promise<EditorModule> {
+  if (!editorLoading) {
+    const file = document.querySelector<HTMLElement>("[data-editor-url]")?.dataset.editorUrl
+    if (!file) return Promise.reject(new Error("Редактор не собран"))
+    editorLoading = import(new URL(file, rootUrl()).toString()).then((m: EditorModule) => {
+      m.init({ root: rootUrl().pathname, entries: getEntries })
+      editorModule = m
+      return m
+    })
+    editorLoading.catch(() => (editorLoading = null))
+  }
+  return editorLoading
+}
+
+function applyMe(me: Me | null) {
+  html.classList.toggle("kb-auth", !!me)
+  document
+    .querySelectorAll<HTMLElement>("[data-account-login]")
+    .forEach((e) => (e.textContent = me?.login ?? ""))
+  document.querySelectorAll<HTMLImageElement>("[data-account-avatar]").forEach((img) => {
+    if (me?.avatar) img.src = me.avatar
+    img.hidden = !me?.avatar
+  })
+}
+
+/** Есть ли бэкенд и вошёл ли пользователь. Без бэкенда кнопки редактирования не показываем. */
+async function checkAuth() {
+  const cached = store.get<Me | null>("kb-me", null)
+  if (cached) html.classList.add("kb-api")
+  applyMe(cached)
+  try {
+    const r = await fetch(apiUrl("me"), { credentials: "same-origin", cache: "no-store" })
+    const isJson = (r.headers.get("content-type") ?? "").includes("json")
+    const body = await r.text() // дочитываем всегда, чтобы соединение не висело
+    if (r.ok && isJson) {
+      const me = JSON.parse(body) as Me
+      store.set("kb-me", me)
+      html.classList.add("kb-api")
+      applyMe(me)
+    } else if (r.status === 401 && isJson) {
+      store.set("kb-me", null)
+      html.classList.add("kb-api")
+      applyMe(null)
+    } else {
+      html.classList.remove("kb-api")
+      applyMe(null)
+    }
+  } catch {
+    // нет сети — оставляем то, что знали
+  }
+}
+
+function currentNotePath(): string | null {
+  return document.querySelector<HTMLElement>("main[data-file-path]")?.dataset.filePath ?? null
+}
+
+function login() {
+  location.href = apiUrl(
+    `auth/login?next=${encodeURIComponent(location.pathname + location.search)}`,
+  ).toString()
+}
+
+async function editCurrent() {
+  const path = currentNotePath()
+  if (!path) return
+  if (!html.classList.contains("kb-auth")) return login()
+  try {
+    ;(await loadEditor()).openEditor(path)
+  } catch {
+    alert("Не удалось загрузить редактор. Проверьте соединение.")
+  }
+}
+
+async function newNoteHere() {
+  if (!html.classList.contains("kb-auth")) return login()
+  const folder = document.querySelector<HTMLElement>("main[data-folder]")?.dataset.folder ?? ""
+  ;(await loadEditor()).newNote(folder)
+}
+
+/** Сообщение после возврата со страницы входа GitHub (?kb-auth=...). */
+async function handleAuthReturn() {
+  const params = new URLSearchParams(location.search)
+  const status = params.get("kb-auth")
+  if (!status) return
+  params.delete("kb-auth")
+  const q = params.toString()
+  history.replaceState(history.state, "", location.pathname + (q ? `?${q}` : "") + location.hash)
+  const text =
+    status === "ok"
+      ? "Вы вошли — можно редактировать заметки"
+      : status === "denied"
+        ? "Этому аккаунту GitHub редактирование не разрешено"
+        : "Не удалось войти через GitHub, попробуйте ещё раз"
+  try {
+    ;(await loadEditor()).toast(text, { kind: status === "ok" ? "ok" : "error", timeout: 5000 })
+  } catch {}
+}
+
 /* ───────────── обработчики (один раз) ───────────── */
 function bindGlobal() {
   document.addEventListener("click", (ev) => {
@@ -540,6 +655,37 @@ function bindGlobal() {
     }
     if (t.closest("[data-skin-toggle]")) {
       setSkin(currentSkin() === "console" ? "linear" : "console")
+      return
+    }
+    if (t.closest("[data-edit]")) {
+      ev.preventDefault()
+      html.classList.remove("drawer-open")
+      editCurrent()
+      return
+    }
+    if (t.closest("[data-new-note]")) {
+      ev.preventDefault()
+      html.classList.remove("drawer-open")
+      newNoteHere()
+      return
+    }
+    if (t.closest("[data-login]")) {
+      ev.preventDefault()
+      login()
+      return
+    }
+    if (t.closest("[data-logout]")) {
+      ev.preventDefault()
+      fetch(apiUrl("auth/logout"), {
+        method: "POST",
+        headers: { "X-KB-Request": "1" },
+        credentials: "same-origin",
+      })
+        .catch(() => {})
+        .finally(() => {
+          store.set("kb-me", null)
+          applyMe(null)
+        })
       return
     }
     if (t.closest("[data-search]")) {
@@ -622,7 +768,7 @@ function bindGlobal() {
   document.addEventListener("keydown", (ev) => {
     const open = html.classList.contains("palette-open")
     const typing = (ev.target as HTMLElement).closest("input, textarea, [contenteditable]")
-    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") {
+    if ((ev.ctrlKey || ev.metaKey) && ev.code === "KeyK") {
       ev.preventDefault()
       open ? closePalette() : openPalette()
       return
@@ -649,6 +795,11 @@ function bindGlobal() {
       openPalette()
       return
     }
+    if (ev.key === "e" && html.classList.contains("kb-auth") && currentNotePath()) {
+      ev.preventDefault()
+      editCurrent()
+      return
+    }
     if (/^[1-8]$/.test(ev.key)) {
       const box = document.querySelector<HTMLElement>(
         "[data-cards]:not([hidden]), [data-cards-opened]:not([hidden])",
@@ -672,10 +823,20 @@ function bindGlobal() {
   }
 
   setInterval(() => renderTimes(), 60_000)
+
+  addEventListener("beforeunload", (e) => {
+    if (editorModule?.isDirty()) e.preventDefault()
+  })
+  handleAuthReturn()
+  checkAuth().then(() => {
+    if (location.hash === "#edit" && html.classList.contains("kb-auth")) editCurrent()
+  })
 }
 
 /* ───────────── каждая навигация ───────────── */
 function onNav() {
+  editorModule?.onNav()
+  applyMe(html.classList.contains("kb-auth") ? store.get<Me | null>("kb-me", null) : null)
   closePalette()
   html.classList.remove("drawer-open")
   renderTimes()

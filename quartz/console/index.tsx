@@ -6,6 +6,7 @@ import style from "./styles/console.scss"
 
 export { ConsoleFrame } from "./frame"
 export { SvgEmbedFix, GitHistory, PWA } from "./plugins"
+export { EditorBundle, buildEditorBundle } from "./editorBundle"
 
 // Тема выставляется до отрисовки страницы, чтобы не было вспышки. По умолчанию — тёмная.
 const themeScript = `(function(){var t;try{t=localStorage.getItem("theme")}catch(e){}

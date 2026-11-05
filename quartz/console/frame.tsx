@@ -8,6 +8,7 @@ import {
   CStatusbar,
   CTabs,
   CTitlebar,
+  EditFab,
   History,
   Home,
   MobileTabs,
@@ -18,8 +19,17 @@ import {
   Sidebar,
   Toc,
 } from "./components"
-import { pageKind, title } from "./data"
+import { notes, pageKind, pathSegments, title } from "./data"
+import { QuartzPluginData } from "../plugins/vfile"
+import { editorBundle } from "./editorBundle"
 import { Icon } from "./icons"
+
+/** Настоящий путь папки (с пробелами и регистром) по её slug. */
+function realFolder(allFiles: QuartzPluginData[], slug: string): string {
+  const depth = slug.split("/").length
+  const f = notes(allFiles).find((n) => (n.slug ?? "").startsWith(slug + "/"))
+  return f ? pathSegments(f).slice(0, depth).join("/") : ""
+}
 
 /**
  * Один каркас на два оформления (переключаются на клиенте атрибутом data-skin):
@@ -51,6 +61,12 @@ export const ConsoleFrame: PageFrame = {
         : kind === "tag"
           ? "Теги"
           : title(p.fileData)
+    // папка для «Новой заметки»: папка текущей заметки или открытая страница папки
+    const folder = isNote
+      ? pathSegments(p.fileData).slice(0, -1).join("/")
+      : kind === "folder"
+        ? realFolder(p.allFiles, (p.fileData.slug ?? "").replace(/\/index$/, ""))
+        : ""
     return (
       <div class="shell" data-kind={kind}>
         <header class="titlebar skin-c">
@@ -58,7 +74,11 @@ export const ConsoleFrame: PageFrame = {
         </header>
         <CActbar {...p} />
         <Sidebar {...p} />
-        <main class="main center">
+        <main
+          class="main center"
+          data-file-path={isNote ? pathSegments(p.fileData).join("/") : undefined}
+          data-folder={folder}
+        >
           <header class="topbar skin-l">{render(header)}</header>
           <CTabs {...p} />
           {kind === "home" ? (
@@ -119,6 +139,8 @@ export const ConsoleFrame: PageFrame = {
         <CStatusbar {...p} />
         {render(footer)}
         <MobileTabs {...p} />
+        <EditFab {...p} />
+        <span hidden data-editor-url={editorBundle.file}></span>
         <div class="drawer-backdrop" data-drawer-backdrop></div>
         <Palette />
       </div>

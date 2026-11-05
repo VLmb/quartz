@@ -4,6 +4,7 @@
 @use "./fonts";
 @use "./linear";
 @use "./console-skin";
+@use "./editor";
 
 /* ───────────── что показывать в каком оформлении ───────────── */
 html:not([data-skin="console"]) .skin-c {

@@ -1,0 +1,34 @@
+# systemd-сервис бэкенда редактора. Установка: server/deploy/install.sh
+[Unit]
+Description=kb-api — редактор базы знаний (GitHub App)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kb-api
+Group=kb-api
+EnvironmentFile=/etc/kb-api.env
+Environment=DATA_DIR=/var/lib/kb-api
+WorkingDirectory=/opt/kb/server
+ExecStart=/usr/bin/env node src/server.mjs
+Restart=on-failure
+RestartSec=3
+
+# изоляция: сервису нужны только сеть и своя папка с сессиями
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+StateDirectory=kb-api
+StateDirectoryMode=0700
+ReadWritePaths=/var/lib/kb-api
+
+[Install]
+WantedBy=multi-user.target

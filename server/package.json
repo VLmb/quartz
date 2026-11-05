@@ -1,0 +1,14 @@
+{
+  "name": "kb-api",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Бэкенд редактора базы знаний: вход через GitHub App и коммиты в репозиторий заметок",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test tests/*.test.mjs"
+  }
+}

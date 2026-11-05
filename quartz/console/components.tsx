@@ -85,6 +85,17 @@ export function Topbar(props: P) {
         <button type="button" class="icon-btn m-only" data-search aria-label="Поиск">
           <Icon name="search" />
         </button>
+        {pageKind(fileData.slug) === "note" && (
+          <button
+            type="button"
+            class="edit-btn d-only kb-auth-only"
+            data-edit
+            title="Редактировать (E)"
+          >
+            <Icon name="pencil" />
+            Редактировать
+          </button>
+        )}
         <button
           type="button"
           class="icon-btn d-only"
@@ -135,6 +146,40 @@ export function Crumbs({ fileData, allFiles }: P) {
       ))}
       <b>{last}</b>
     </nav>
+  )
+}
+
+/* ───────────── вход для редактирования ───────────── */
+
+export function Account() {
+  return (
+    <div class="account">
+      <button type="button" class="acc-login kb-anon-only" data-login>
+        <Icon name="login" />
+        Войти, чтобы редактировать
+      </button>
+      <div class="acc-user kb-auth-only">
+        <img class="acc-ava" data-account-avatar alt="" width="20" height="20" />
+        <span class="acc-name" data-account-login></span>
+        <button type="button" class="icon-btn sm" data-logout title="Выйти" aria-label="Выйти">
+          <Icon name="logout" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** Плавающая кнопка на телефоне: на заметке — править, на остальных страницах — создать. */
+export function EditFab({ fileData }: P) {
+  const isNote = pageKind(fileData.slug) === "note"
+  return isNote ? (
+    <button type="button" class="kb-fab kb-auth-only" data-edit aria-label="Редактировать">
+      <Icon name="pencil" />
+    </button>
+  ) : (
+    <button type="button" class="kb-fab kb-auth-only" data-new-note aria-label="Новая заметка">
+      <Icon name="plus" />
+    </button>
   )
 }
 
@@ -257,12 +302,22 @@ export function Sidebar({ fileData, allFiles, cfg }: P) {
       <div class="pane-h">
         <span>Хранилище</span>
         <span class="pane-n">{total}</span>
+        <button
+          type="button"
+          class="icon-btn sm kb-auth-only"
+          data-new-note
+          title="Новая заметка"
+          aria-label="Новая заметка"
+        >
+          <Icon name="plus" />
+        </button>
       </div>
       <ul class="tree">
         <TreeLevel node={tree} current={current} />
         {total === 0 && <li class="tree-empty">Пока пусто</li>}
       </ul>
       <div class="sb-foot">
+        <Account />
         <span class="sync">
           <i></i>
           <Ago ts={lastUpdate(allFiles)} prefix="обновлено " />
@@ -594,6 +649,26 @@ export function CTitlebar({ fileData, allFiles, cfg }: P) {
           <Icon name="offline" />
           офлайн
         </span>
+        {pageKind(fileData.slug) === "note" && (
+          <button
+            class="tb-btn kb-auth-only"
+            data-edit
+            type="button"
+            title="Редактировать (E)"
+            aria-label="Редактировать"
+          >
+            <Icon name="pencil" />
+          </button>
+        )}
+        <button
+          class="tb-btn kb-auth-only"
+          data-new-note
+          type="button"
+          title="Новая заметка"
+          aria-label="Новая заметка"
+        >
+          <Icon name="plus" />
+        </button>
         <button
           class="tb-btn"
           data-skin-toggle
@@ -784,6 +859,14 @@ export function CStatusbar({ fileData, allFiles }: P) {
           <span class="sb-item">{readingMinutes(fileData)} мин чтения</span>
         </>
       )}
+      <button class="sb-item kb-anon-only" type="button" data-login>
+        <Icon name="login" />
+        войти
+      </button>
+      <button class="sb-item kb-auth-only" type="button" data-logout title="Выйти">
+        <Icon name="logout" />
+        <span data-account-login></span>
+      </button>
       <button class="sb-item" type="button" data-skin-toggle title="Переключить оформление">
         <Icon name="palette" />
         Консоль
