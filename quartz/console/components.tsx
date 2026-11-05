@@ -40,76 +40,104 @@ function lastUpdate(allFiles: QuartzPluginData[]): number {
   return Math.max(0, ...notes(allFiles).map(modifiedTs))
 }
 
-/* ───────────── шапка ───────────── */
+function plural(n: number, one: string, few: string, many: string): string {
+  const m10 = n % 10
+  const m100 = n % 100
+  if (m10 === 1 && m100 !== 11) return one
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few
+  return many
+}
 
-export function Titlebar({ fileData, allFiles, cfg }: P) {
+function Tags({ f, from }: { f: QuartzPluginData; from?: string }) {
+  const t = tags(f)
+  if (t.length === 0) return null
+  return (
+    <span class="pills">
+      {t.map((tag) =>
+        from !== undefined ? (
+          <a class="pill" href={tagHref(from, tag)}>
+            {tag}
+          </a>
+        ) : (
+          <span class="pill">{tag}</span>
+        ),
+      )}
+    </span>
+  )
+}
+
+/* ───────────── верхняя панель (над контентом) ───────────── */
+
+export function Topbar(props: P) {
+  const { fileData, cfg } = props
   return (
     <>
-      <a class="tb-logo" href={href(fileData.slug, "index")}>
-        <span class="tb-mark">
-          <Icon name="terminal" />
-        </span>
-        <b>{cfg.pageTitle}</b>
-        <span class="tb-path">~/knowledge</span>
-      </a>
-      <button class="cmd" data-search type="button">
-        <Icon name="search" />
-        <span>Найти заметку или тег</span>
-        <kbd>Ctrl K</kbd>
+      <button type="button" class="icon-btn m-only" data-drawer aria-label="Меню">
+        <Icon name="menu" />
       </button>
+      <Crumbs {...props} />
       <div class="tb-right">
-        <span class="sync" title="Последнее изменение в базе">
-          <i></i>
-          <Ago ts={lastUpdate(allFiles)} prefix="обновлено " />
-        </span>
         <span class="offline-badge" title="Нет сети — показываю сохранённую копию">
           <Icon name="offline" />
           офлайн
         </span>
-        <button class="tb-btn tt" data-theme-toggle type="button" aria-label="Сменить тему">
-          <Icon name="sun" cls="i-sun" />
-          <Icon name="moon" cls="i-moon" />
+        <button type="button" class="icon-btn m-only" data-search aria-label="Поиск">
+          <Icon name="search" />
         </button>
+        <button
+          type="button"
+          class="icon-btn d-only"
+          data-global-graph
+          title="Граф связей (Ctrl G)"
+          aria-label="Граф связей"
+        >
+          <Icon name="graph" />
+        </button>
+        <a class="m-only tb-home" href={href(fileData.slug, "index")} aria-label={cfg.pageTitle}>
+          <span class="mark">
+            <Icon name="terminal" />
+          </span>
+        </a>
       </div>
       <span class="tb-progress" data-progress></span>
     </>
   )
 }
 
-/* ───────────── панель активности ───────────── */
-
-export function Actbar({ fileData }: P) {
-  const kind = pageKind(fileData.slug)
+export function Crumbs({ fileData, allFiles }: P) {
+  const slug = fileData.slug ?? "index"
+  const kind = pageKind(slug)
+  const names = folderNames(allFiles)
+  const parts = slug.split("/")
+  const dirSlugs =
+    kind === "folder" ? parts.slice(0, -2) : kind === "note" ? parts.slice(0, -1) : []
+  const crumbs = dirSlugs.map((_, i) => dirSlugs.slice(0, i + 1).join("/"))
+  const last =
+    kind === "home"
+      ? "Главная"
+      : kind === "tag" && slug !== "tags/index"
+        ? `#${title(fileData)}`
+        : title(fileData)
   return (
-    <nav class="actbar">
-      <a
-        href={href(fileData.slug, "index")}
-        class={`act ${kind !== "tag" ? "on" : ""}`}
-        title="Файлы"
-      >
-        <Icon name="file" />
-      </a>
-      <button type="button" data-search class="act" title="Поиск (Ctrl K)">
-        <Icon name="search" />
-      </button>
-      <button type="button" data-global-graph class="act" title="Граф связей (Ctrl G)">
-        <Icon name="graph" />
-      </button>
-      <a href={href(fileData.slug, "index") + "#review"} class="act" title="Повторение">
-        <Icon name="repeat" />
-      </a>
-      <a
-        href={href(fileData.slug, "tags/index")}
-        class={`act ${kind === "tag" ? "on" : ""}`}
-        title="Теги"
-      >
-        <Icon name="tag" />
-      </a>
+    <nav class="crumbs" aria-label="Путь">
+      {kind === "tag" && slug !== "tags/index" && (
+        <>
+          <a href={href(slug, "tags/index")}>Теги</a>
+          <Icon name="chev" cls="sep" />
+        </>
+      )}
+      {crumbs.map((c) => (
+        <>
+          <a href={folderHref(slug, c)}>{names.get(c) ?? c}</a>
+          <Icon name="chev" cls="sep" />
+        </>
+      ))}
+      <b>{last}</b>
     </nav>
   )
 }
 
-/* ───────────── проводник ───────────── */
+/* ───────────── боковая панель ───────────── */
 
 type TreeNode = {
   name: string
@@ -158,8 +186,7 @@ function TreeLevel({ node, current }: { node: TreeNode; current: string }) {
           <li class={open ? "open" : ""} data-dir={d.slug}>
             <button type="button" class="f-dir">
               <Icon name="chev" cls="chev" />
-              <Icon name="folder" cls="fold" />
-              <span>{d.name}</span>
+              <span class="f-name">{d.name}</span>
               <span class="f-n">{countFiles(d)}</span>
             </button>
             <ul>
@@ -172,11 +199,10 @@ function TreeLevel({ node, current }: { node: TreeNode; current: string }) {
         <li>
           <a
             href={href(current, f.slug!)}
-            class={`f-file ${f.slug === current ? "f-on" : ""}`}
+            class={`f-file ${f.slug === current ? "on" : ""}`}
             data-slug={f.slug}
           >
             {title(f)}
-            <span class="ext">.md</span>
           </a>
         </li>
       ))}
@@ -184,150 +210,138 @@ function TreeLevel({ node, current }: { node: TreeNode; current: string }) {
   )
 }
 
-export function Explorer({ fileData, allFiles }: P) {
+export function Sidebar({ fileData, allFiles, cfg }: P) {
   const tree = buildTree(allFiles)
   const current = fileData.slug ?? "index"
+  const kind = pageKind(current)
+  const total = countFiles(tree)
   return (
-    <>
+    <aside class="side" data-explorer>
+      <div class="sb-top">
+        <a class="ws" href={href(current, "index")}>
+          <span class="mark">
+            <Icon name="terminal" />
+          </span>
+          <b>{cfg.pageTitle}</b>
+        </a>
+        <button type="button" class="icon-btn tt" data-theme-toggle aria-label="Сменить тему">
+          <Icon name="sun" cls="i-sun" />
+          <Icon name="moon" cls="i-moon" />
+        </button>
+      </div>
+      <button type="button" class="sb-search" data-search>
+        <Icon name="search" />
+        <span>Поиск</span>
+        <kbd>Ctrl K</kbd>
+      </button>
+      <nav class="sb-nav">
+        <a href={href(current, "index")} class={`nav-i ${kind === "home" ? "on" : ""}`}>
+          <Icon name="home" />
+          Главная
+        </a>
+        <a href={href(current, "index") + "#review"} class="nav-i">
+          <Icon name="repeat" />
+          Повторение
+          <span class="nav-n" data-review-badge></span>
+        </a>
+        <button type="button" class="nav-i" data-global-graph>
+          <Icon name="graph" />
+          Граф связей
+        </button>
+        <a href={href(current, "tags/index")} class={`nav-i ${kind === "tag" ? "on" : ""}`}>
+          <Icon name="hash" />
+          Теги
+        </a>
+      </nav>
       <div class="pane-h">
         <span>Хранилище</span>
-        <span class="pane-n">{countFiles(tree)}</span>
+        <span class="pane-n">{total}</span>
       </div>
       <ul class="tree">
-        <li>
-          <a
-            href={href(current, "index")}
-            class={`f-file f-home ${current === "index" ? "f-on" : ""}`}
-          >
-            <Icon name="home" />
-            Главная
-          </a>
-        </li>
         <TreeLevel node={tree} current={current} />
+        {total === 0 && <li class="tree-empty">Пока пусто</li>}
       </ul>
-    </>
+      <div class="sb-foot">
+        <span class="sync">
+          <i></i>
+          <Ago ts={lastUpdate(allFiles)} prefix="обновлено " />
+        </span>
+      </div>
+    </aside>
   )
 }
 
-/* ───────────── вкладки ───────────── */
+/* ───────────── заметка ───────────── */
 
-export function Tabs({ fileData }: P) {
-  const kind = pageKind(fileData.slug)
-  const label =
-    kind === "note"
-      ? `${title(fileData)}.md`
-      : kind === "folder"
-        ? `${title(fileData)}/`
-        : kind === "tag"
-          ? `#${title(fileData)}`
-          : null
+export function NoteMeta({ fileData }: P) {
+  const folder = folderOf(fileData)
+  const slug = fileData.slug ?? ""
+  const folderSlug = slug.split("/").slice(0, -1).join("/")
   return (
-    <div class="tabs">
-      <a href={href(fileData.slug, "index")} class={`tab ${kind === "home" ? "on" : ""}`}>
-        <Icon name="home" />
-        Главная
-      </a>
-      {label && (
-        <span class="tab on">
-          <Icon name={kind === "folder" ? "folder" : kind === "tag" ? "tag" : "file"} />
-          <span class="tab-t">{label}</span>
-          <a class="x" href={href(fileData.slug, "index")} aria-label="Закрыть">
-            <Icon name="x" />
-          </a>
-        </span>
+    <div class="n-meta">
+      {folder && (
+        <a class="badge" href={folderHref(slug, folderSlug)}>
+          <Icon name="folder" />
+          {folder}
+        </a>
       )}
+      <Tags f={fileData} from={slug} />
+      <span class="meta-t">
+        <Ago ts={modifiedTs(fileData)} />
+      </span>
+      <span class="meta-t">{readingMinutes(fileData)} мин</span>
     </div>
   )
 }
 
-/* ───────────── шапка заметки ───────────── */
-
-export function Crumbs({ fileData, allFiles, cfg }: P) {
+export function Properties({ fileData }: P) {
   const slug = fileData.slug ?? ""
-  const kind = pageKind(slug)
-  const names = folderNames(allFiles)
-  const parts = slug.split("/")
-  const dirSlugs =
-    kind === "folder" ? parts.slice(0, -2) : kind === "note" ? parts.slice(0, -1) : []
-  const crumbs = dirSlugs.map((_, i) => dirSlugs.slice(0, i + 1).join("/"))
-  const last =
-    kind === "note"
-      ? `${title(fileData)}.md`
-      : kind === "folder"
-        ? `${title(fileData)}/`
-        : title(fileData)
-  return (
-    <nav class="crumbs">
-      <a href={href(slug, "index")}>{cfg.pageTitle}</a>
-      {kind === "tag" && (
-        <>
-          <span>/</span>
-          <a href={href(slug, "tags/index")}>теги</a>
-        </>
-      )}
-      {crumbs.map((c) => (
-        <>
-          <span>/</span>
-          <a href={folderHref(slug, c)}>{names.get(c) ?? c}</a>
-        </>
-      ))}
-      {slug !== "tags/index" && (
-        <>
-          <span>/</span>
-          <b>{last}</b>
-        </>
-      )}
-    </nav>
-  )
-}
-
-export function Frontmatter({ fileData }: P) {
-  const t = tags(fileData)
   const created = fileData.dates?.created ? new Date(fileData.dates.created).getTime() : 0
   const modified = modifiedTs(fileData)
   const review = reviewDate(fileData)
+  const words = wordCount(fileData)
   return (
-    <pre class="fm">
-      <span class="fm-d">---</span>
-      {"\n"}
-      {t.length > 0 && (
-        <>
-          <span class="fm-k">tags:</span> [
-          {t.map((tag, i) => (
-            <>
-              {i > 0 && ", "}
-              <a class="fm-tag" href={tagHref(fileData.slug, tag)}>
-                {tag}
-              </a>
-            </>
-          ))}
-          ]{"\n"}
-        </>
-      )}
-      {created > 0 && (
-        <>
-          <span class="fm-k">created:</span> <span class="fm-n">{isoDay(created)}</span>
-          {"\n"}
-        </>
-      )}
-      {modified > 0 && (
-        <>
-          <span class="fm-k">updated:</span> <Ago ts={modified} />
-          {"\n"}
-        </>
-      )}
-      {review && (
-        <>
-          <span class="fm-k">review:</span> <span class="fm-n">{review}</span>
-          {"\n"}
-        </>
-      )}
-      <span class="fm-d">---</span>
-    </pre>
+    <section class="pane">
+      <div class="pane-h">
+        <span>Свойства</span>
+      </div>
+      <dl class="props">
+        {tags(fileData).length > 0 && (
+          <>
+            <dt>Теги</dt>
+            <dd>
+              <Tags f={fileData} from={slug} />
+            </dd>
+          </>
+        )}
+        {modified > 0 && (
+          <>
+            <dt>Изменено</dt>
+            <dd>
+              <Ago ts={modified} />
+            </dd>
+          </>
+        )}
+        {created > 0 && (
+          <>
+            <dt>Создано</dt>
+            <dd class="mono">{isoDay(created)}</dd>
+          </>
+        )}
+        {review && (
+          <>
+            <dt>Повторить</dt>
+            <dd class="mono">{review}</dd>
+          </>
+        )}
+        <dt>Объём</dt>
+        <dd>
+          {words} {plural(words, "слово", "слова", "слов")} · {readingMinutes(fileData)} мин
+        </dd>
+      </dl>
+    </section>
   )
 }
-
-/* ───────────── оглавление ───────────── */
 
 export function Toc({ fileData }: P) {
   const toc = (fileData.toc ?? []).filter((t) => t.depth <= 2)
@@ -350,7 +364,7 @@ export function MobileToc(props: P) {
     <details class="mobile-toc">
       <summary>
         <Icon name="list" />
-        Оглавление
+        Содержание
         <Icon name="chevDown" cls="mt-ic" />
       </summary>
       <Toc {...props} />
@@ -358,47 +372,44 @@ export function MobileToc(props: P) {
   )
 }
 
-/* ───────────── история (git log) ───────────── */
-
 export function History({ fileData }: P) {
   const hist = fileData.gitHistory ?? []
   if (hist.length === 0) return null
   return (
-    <>
+    <section class="pane">
       <div class="pane-h">
         <span>История</span>
       </div>
       <ol class="hist">
         {hist.map((c) => (
           <li>
-            <span class="l-hash">{c.hash}</span>
-            <span>{c.msg}</span>
-            <em>
+            <span class="hash">{c.hash}</span>
+            <span class="h-msg">{c.msg}</span>
+            <span class="h-when">
               <Ago ts={c.ts} />
-            </em>
+            </span>
           </li>
         ))}
       </ol>
-    </>
+    </section>
   )
 }
-
-/* ───────────── обратные ссылки ───────────── */
 
 export function Backlinks({ fileData, allFiles }: P) {
   const bl = backlinksOf(allFiles, fileData.slug ?? "")
   if (bl.length === 0) return null
   return (
     <section class="n-end">
-      <h2 class="h2">
-        Ссылаются сюда <span class="cmt">{bl.length}</span>
+      <h2 class="sec-t">
+        Ссылаются сюда <span class="count">{bl.length}</span>
       </h2>
-      <div class="bl-grid">
+      <div class="rows">
         {bl.map((f) => (
-          <a class="bl" href={href(fileData.slug, f.slug!)}>
-            <span class="bl-p">{folderOf(f) ?? "/"}</span>
-            <b>{title(f)}</b>
-            {desc(f) && <span>{desc(f)}</span>}
+          <a class="row" href={href(fileData.slug, f.slug!)}>
+            <Icon name="file" cls="row-ic" />
+            <span class="row-t">{title(f)}</span>
+            <span class="row-x">{desc(f)}</span>
+            <span class="badge">{folderOf(f) ?? "/"}</span>
           </a>
         ))}
       </div>
@@ -408,46 +419,23 @@ export function Backlinks({ fileData, allFiles }: P) {
 
 /* ───────────── главная ───────────── */
 
-function Card({
-  f,
-  from,
-  i,
-  wide,
-}: {
-  f: QuartzPluginData
-  from: string
-  i: number
-  wide?: boolean
-}) {
-  const t = tags(f)
+function NoteRow({ f, from, i }: { f: QuartzPluginData; from: string; i: number }) {
   return (
-    <a
-      class={`card ${wide ? "c-wide" : ""}`}
-      href={href(from, f.slug!)}
-      data-key={i + 1}
-      data-slug={f.slug}
-    >
-      <span class="c-top">
-        <span class="c-path">
-          <Icon name="folder" />
-          {folderOf(f) ?? "/"}
-        </span>
-        <span class="c-when">
-          <Ago ts={modifiedTs(f)} />
-        </span>
+    <a class="row card" href={href(from, f.slug!)} data-key={i + 1} data-slug={f.slug}>
+      <Icon name="file" cls="row-ic" />
+      <span class="row-t">{title(f)}</span>
+      <span class="row-x">{desc(f)}</span>
+      <Tags f={f} />
+      <span class="badge">{folderOf(f) ?? "/"}</span>
+      <span class="row-when">
+        <Ago ts={modifiedTs(f)} />
       </span>
-      <b class="c-t">{title(f)}</b>
-      {desc(f) && <p class="c-x">{desc(f)}</p>}
-      <span class="c-bot">
-        <span class="c-tags">{t.map((x) => `#${x}`).join(" ")}</span>
-        {i < 8 && <kbd class="c-k">{i + 1}</kbd>}
-      </span>
+      {i < 8 && <kbd class="row-k">{i + 1}</kbd>}
     </a>
   )
 }
 
-export function Home(props: P) {
-  const { fileData, allFiles } = props
+export function Home({ fileData, allFiles }: P) {
   const from = fileData.slug ?? "index"
   const all = notes(allFiles)
   const recent = [...all].sort((a, b) => modifiedTs(b) - modifiedTs(a)).slice(0, 8)
@@ -459,73 +447,81 @@ export function Home(props: P) {
   const folders = topFolders(allFiles)
   return (
     <div class="home-wrap">
-      <div class="hero">
+      <header class="hero">
+        <h1 class="display">База знаний</h1>
+        <p class="lede">
+          {all.length} {plural(all.length, "заметка", "заметки", "заметок")} в {folders.length}{" "}
+          {plural(folders.length, "разделе", "разделах", "разделах")} ·{" "}
+          <Ago ts={lastUpdate(allFiles)} prefix="обновлено " />
+        </p>
         <button class="big-search" data-search type="button">
           <Icon name="search" />
-          <span>Что ищем?</span>
-          <span class="bs-hint">заметки, теги, заголовки</span>
+          <span>Найти заметку, тег или раздел</span>
           <kbd>Ctrl K</kbd>
         </button>
-        <div class="chips">
-          {folders.map((d) => (
-            <a href={folderHref(from, d.slug)} class="chip">
-              {d.name} <span>{d.count}</span>
-            </a>
-          ))}
-        </div>
-      </div>
+        {folders.length > 0 && (
+          <div class="chips">
+            {folders.map((d) => (
+              <a href={folderHref(from, d.slug)} class="pill">
+                {d.name}
+                <span>{d.count}</span>
+              </a>
+            ))}
+          </div>
+        )}
+      </header>
+
+      <div class="continue" data-continue hidden></div>
 
       <section class="sec">
         <div class="sec-h">
-          <h2 class="h2">Недавние</h2>
+          <h2 class="sec-t">Недавние</h2>
           <div class="seg" data-seg>
             <button type="button" class="on" data-mode="modified">
-              изменённые
+              Изменённые
             </button>
             <button type="button" data-mode="opened">
-              открытые
+              Открытые
             </button>
           </div>
           <span class="sec-sp"></span>
           <span class="kh">
-            <kbd>1</kbd>–<kbd>8</kbd> открыть
+            <kbd>1</kbd>–<kbd>8</kbd>
           </span>
-          <div class="vt" data-vt>
-            <button type="button" class="on" data-mode="grid" aria-label="Карточки">
-              <Icon name="grid" />
-            </button>
-            <button type="button" data-mode="list" aria-label="Список">
+          <div class="seg seg-ic" data-vt>
+            <button type="button" class="on" data-mode="list" aria-label="Список">
               <Icon name="list" />
+            </button>
+            <button type="button" data-mode="grid" aria-label="Карточки">
+              <Icon name="grid" />
             </button>
           </div>
         </div>
-        <div class="cards" data-cards>
+        <div class="cards rows" data-cards>
           {recent.map((f, i) => (
-            <Card f={f} from={from} i={i} wide={i === 0} />
+            <NoteRow f={f} from={from} i={i} />
           ))}
           {recent.length === 0 && <p class="empty">Пока нет заметок — создай первую в Obsidian.</p>}
         </div>
-        <div class="cards" data-cards-opened hidden></div>
+        <div class="cards rows" data-cards-opened hidden></div>
       </section>
 
       <div class="two">
         <section class="sec">
           <div class="sec-h">
-            <h2 class="h2">Закреплённые</h2>
-            <span class="sec-n">{pinned.length}</span>
+            <h2 class="sec-t">Закреплённые</h2>
+            <span class="count">{pinned.length}</span>
           </div>
           {pinned.length > 0 ? (
-            <ul class="rows">
+            <div class="rows">
               {pinned.map((f) => (
-                <li>
-                  <a href={href(from, f.slug!)}>
-                    <Icon name="star" cls="pin" />
-                    <span class="r-t">{title(f)}</span>
-                    <span class="r-p">{folderOf(f) ?? ""}</span>
-                  </a>
-                </li>
+                <a class="row" href={href(from, f.slug!)}>
+                  <Icon name="star" cls="row-ic" />
+                  <span class="row-t">{title(f)}</span>
+                  <span class="badge">{folderOf(f) ?? "/"}</span>
+                </a>
               ))}
-            </ul>
+            </div>
           ) : (
             <p class="empty">
               Добавь <code>pinned: true</code> во frontmatter заметки.
@@ -534,18 +530,18 @@ export function Home(props: P) {
         </section>
         <section class="sec" id="review">
           <div class="sec-h">
-            <h2 class="h2">Повторить сегодня</h2>
-            <span class="sec-n" data-review-count></span>
+            <h2 class="sec-t">Повторить сегодня</h2>
+            <span class="count" data-review-count></span>
           </div>
-          <ul class="todo" data-review>
+          <ul class="rows todo" data-review>
             {review.map(({ f, due }) => (
               <li data-due={due} data-slug={f.slug}>
-                <label>
+                <label class="row">
                   <input type="checkbox" />
                   <span class="box">
                     <Icon name="check" />
                   </span>
-                  <a class="td-t" href={href(from, f.slug!)}>
+                  <a class="row-t" href={href(from, f.slug!)}>
                     {title(f)}
                   </a>
                   <span class="td-d">{due}</span>
@@ -562,34 +558,7 @@ export function Home(props: P) {
   )
 }
 
-/* ───────────── статусбар и мобильные вкладки ───────────── */
-
-export function Statusbar({ fileData, allFiles }: P) {
-  const kind = pageKind(fileData.slug)
-  return (
-    <footer class="statusbar">
-      <span class="sb-item">
-        <Icon name="branch" />
-        main
-      </span>
-      <span class="sb-item">
-        <Icon name="sync" />
-        <Ago ts={lastUpdate(allFiles)} />
-      </span>
-      <span class="sb-item">{notes(allFiles).length} заметок</span>
-      <span class="sb-sp"></span>
-      {kind === "note" && (
-        <>
-          <span class="sb-item">{wordCount(fileData)} слов</span>
-          <span class="sb-item">{readingMinutes(fileData)} мин чтения</span>
-        </>
-      )}
-      <button class="sb-item" type="button" data-theme-toggle>
-        <span class="sb-theme"></span>
-      </button>
-    </footer>
-  )
-}
+/* ───────────── мобильные вкладки и палитра ───────────── */
 
 export function MobileTabs({ fileData }: P) {
   const kind = pageKind(fileData.slug)
@@ -630,7 +599,7 @@ export function Palette() {
           <input
             class="palette-input"
             data-palette-input
-            placeholder="Найти заметку или тег…"
+            placeholder="Найти заметку или #тег…"
             autocomplete="off"
             spellcheck={false}
           />

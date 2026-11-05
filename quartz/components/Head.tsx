@@ -96,8 +96,7 @@ export default (() => {
           href={joinSegments(baseDir, "manifest.webmanifest")}
           crossOrigin="use-credentials"
         />
-        <meta name="theme-color" content="#efefec" media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content="#0e1110" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#08090a" />
         <link
           rel="apple-touch-icon"
           href={joinSegments(baseDir, "static/pwa/apple-touch-icon.png")}

@@ -20,30 +20,30 @@ configuration:
     fontOrigin: local
     cdnCaching: false
     typography:
-      header: JetBrains Mono
-      body: Onest
+      header: Inter
+      body: Inter
       code: JetBrains Mono
     colors:
       lightMode:
-        light: "#f6f6f4"
-        lightgray: "#e0e0db"
-        gray: "#858a87"
-        darkgray: "#474c49"
-        dark: "#171918"
-        secondary: "#3d7a28"
-        tertiary: "#3d7a28"
-        highlight: rgba(61, 122, 40, 0.07)
-        textHighlight: rgba(61, 122, 40, 0.14)
+        light: "#ffffff"
+        lightgray: "#e6e6e6"
+        gray: "#8a8f98"
+        darkgray: "#3c4149"
+        dark: "#08090a"
+        secondary: "#08090a"
+        tertiary: "#6b6f76"
+        highlight: rgba(0, 0, 0, 0.05)
+        textHighlight: rgba(99, 102, 241, 0.18)
       darkMode:
-        light: "#0b0d0c"
-        lightgray: "#1d2220"
-        gray: "#6a736f"
-        darkgray: "#a2aaa6"
-        dark: "#dde2df"
-        secondary: "#a6d189"
-        tertiary: "#a6d189"
-        highlight: rgba(166, 209, 137, 0.07)
-        textHighlight: rgba(166, 209, 137, 0.16)
+        light: "#08090a"
+        lightgray: "#23252a"
+        gray: "#62666d"
+        darkgray: "#d0d6e0"
+        dark: "#ffffff"
+        secondary: "#e4f222"
+        tertiary: "#8a8f98"
+        highlight: rgba(255, 255, 255, 0.05)
+        textHighlight: rgba(99, 102, 241, 0.28)
 plugins:
   - source: "@quartz-community/created-modified-date"
     enabled: true

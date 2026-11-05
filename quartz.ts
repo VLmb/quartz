@@ -3,7 +3,7 @@ import { frameRegistry } from "./quartz/components/frames/registry"
 import { PageTypeDispatcher } from "./quartz/plugins/pageTypes/dispatcher"
 import ConsoleChrome, { ConsoleFrame, GitHistory, PWA, SvgEmbedFix } from "./quartz/console"
 
-// Тема «Консоль»: свой каркас страницы, шапка (несёт стили и скрипты темы),
+// Тема в стиле Linear: свой каркас страницы, верхняя полоса (несёт стили и скрипты темы),
 // исправление SVG-вставок, история правок из git и PWA. Код темы — в quartz/console.
 frameRegistry.register("console", ConsoleFrame, "quartz/console")
 

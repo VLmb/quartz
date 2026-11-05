@@ -104,7 +104,7 @@ function setTheme(t: "light" | "dark") {
   } catch {}
   document
     .querySelectorAll('meta[name="theme-color"]')
-    .forEach((m) => m.setAttribute("content", t === "dark" ? "#0e1110" : "#efefec"))
+    .forEach((m) => m.setAttribute("content", t === "dark" ? "#08090a" : "#ffffff"))
   document.dispatchEvent(new CustomEvent("themechange", { detail: { theme: t } }))
 }
 function toggleTheme() {
@@ -278,8 +278,8 @@ function restoreExplorer() {
   document.querySelectorAll<HTMLElement>(".tree li[data-dir]").forEach((li) => {
     if (open.has(li.dataset.dir!)) li.classList.add("open")
   })
-  const cur = document.querySelector<HTMLElement>(".explorer .f-on")
-  const pane = document.querySelector<HTMLElement>(".explorer")
+  const cur = document.querySelector<HTMLElement>("[data-explorer] .f-file.on")
+  const pane = document.querySelector<HTMLElement>("[data-explorer]")
   if (cur && pane) {
     const top = cur.offsetTop
     if (top < pane.scrollTop || top > pane.scrollTop + pane.clientHeight - 40) {
@@ -378,23 +378,33 @@ function enhanceCode() {
 }
 
 /* ───────────── главная ───────────── */
-function cardHtml(
-  e: Entry,
-  i: number,
-  extra?: { label?: string; p?: number; when?: number; wide?: boolean },
-) {
+function rowHtml(e: Entry, i: number, when?: number) {
   const topic = topicOf(e)
-  const tags = e.tags.map((t) => `#${esc(t)}`).join(" ")
-  const words = e.content.split(/\s+/).length
-  const left = extra?.p != null ? Math.max(1, Math.round((words * (1 - extra.p)) / 180)) : 0
-  return `<a class="card${extra?.wide ? " c-wide" : ""}" href="${urlFor(e.slug)}" data-key="${i + 1}" data-slug="${esc(e.slug)}">
-    <span class="c-top"><span class="c-path">${iconString("folder")}${esc(topic || "/")}</span><span class="c-when">${extra?.when ? `<time data-ago="${extra.when}"></time>` : ""}</span></span>
-    ${extra?.label ? `<span class="c-label">${extra.label}</span>` : ""}
-    <b class="c-t">${esc(e.title)}</b>
-    <p class="c-x">${esc(excerptOf(e))}</p>
-    ${extra?.p != null ? `<span class="c-prog"><i style="width:${Math.round(extra.p * 100)}%"></i></span>` : ""}
-    <span class="c-bot"><span class="c-tags">${tags}</span>${extra?.p != null ? `<span class="c-pct">${Math.round(extra.p * 100)}% · ${left} мин осталось</span>` : ""}${i < 8 ? `<kbd class="c-k">${i + 1}</kbd>` : ""}</span>
+  const tags = e.tags.length
+    ? `<span class="pills">${e.tags.map((t) => `<span class="pill">${esc(t)}</span>`).join("")}</span>`
+    : ""
+  return `<a class="row card" href="${urlFor(e.slug)}" data-key="${i + 1}" data-slug="${esc(e.slug)}">
+    ${iconString("file", "row-ic")}
+    <span class="row-t">${esc(e.title)}</span>
+    <span class="row-x">${esc(excerptOf(e))}</span>
+    ${tags}
+    <span class="badge">${esc(topic || "/")}</span>
+    <span class="row-when">${when ? `<time data-ago="${when}"></time>` : ""}</span>
+    ${i < 8 ? `<kbd class="row-k">${i + 1}</kbd>` : ""}
   </a>`
+}
+
+function continueHtml(e: Entry, p: number, when: number) {
+  const words = e.content.split(/\s+/).length
+  const left = Math.max(1, Math.round((words * (1 - p)) / 180))
+  const pct = Math.round(p * 100)
+  return `<div class="cont-main">
+      <span class="cont-label">Продолжить чтение · ${esc(topicOf(e) || "/")}</span>
+      <h2 class="cont-t">${esc(e.title)}</h2>
+      <p class="cont-x">${esc(excerptOf(e))}</p>
+    </div>
+    <a class="btn-primary" href="${urlFor(e.slug)}">Продолжить ${iconString("arrowRight")}</a>
+    <div class="cont-prog"><span class="cont-bar"><i style="width:${pct}%"></i></span>${pct}% · ещё ${left} мин · <time data-ago="${when}"></time></div>`
 }
 
 async function setupHome() {
@@ -405,27 +415,11 @@ async function setupHome() {
   const opened = store.get<Opened[]>("kb-opened", []).filter((o) => bySlug.has(o.s))
 
   // «Продолжить чтение»: последняя заметка, дочитанная не до конца
+  const box = document.querySelector<HTMLElement>("[data-continue]")
   const cont = opened.find((o) => o.p > 0.03 && o.p < 0.95)
-  if (cont && !cards.querySelector(".c-continue")) {
-    const e = bySlug.get(cont.s)!
-    cards.querySelector(`.card[data-slug="${CSS.escape(cont.s)}"]`)?.remove()
-    cards.querySelector(".c-wide")?.classList.remove("c-wide")
-    const tmp = document.createElement("div")
-    tmp.innerHTML = cardHtml(e, 0, {
-      label: "Продолжить чтение",
-      p: cont.p,
-      when: cont.t,
-      wide: true,
-    })
-    const card = tmp.firstElementChild as HTMLElement
-    card.classList.add("c-continue")
-    cards.prepend(card)
-    ;[...cards.querySelectorAll<HTMLElement>(".card")].forEach((c, i) => {
-      c.dataset.key = String(i + 1)
-      const k = c.querySelector(".c-k")
-      if (k) k.textContent = String(i + 1)
-      if (i >= 8) c.remove()
-    })
+  if (box) {
+    box.hidden = !cont
+    if (cont) box.innerHTML = continueHtml(bySlug.get(cont.s)!, cont.p, cont.t)
   }
 
   // «открытые»
@@ -434,7 +428,7 @@ async function setupHome() {
     openedBox.innerHTML = opened.length
       ? opened
           .slice(0, 8)
-          .map((o, i) => cardHtml(bySlug.get(o.s)!, i, { when: o.t, wide: i === 0 }))
+          .map((o, i) => rowHtml(bySlug.get(o.s)!, i, o.t))
           .join("")
       : `<p class="empty">Здесь появятся заметки, которые ты открывал на этом устройстве.</p>`
   }
@@ -444,7 +438,7 @@ async function setupHome() {
 
 function applyHomeModes() {
   const seg = store.get<string>("kb-home-seg", "modified")
-  const vt = store.get<string>("kb-home-vt", "grid")
+  const vt = store.get<string>("kb-home-vt", "list")
   document
     .querySelectorAll<HTMLButtonElement>("[data-seg] button")
     .forEach((b) => b.classList.toggle("on", b.dataset.mode === seg))
@@ -456,9 +450,15 @@ function applyHomeModes() {
   if (a && b) {
     a.hidden = seg !== "modified"
     b.hidden = seg !== "opened"
-    a.classList.toggle("list", vt === "list")
-    b.classList.toggle("list", vt === "list")
+    a.classList.toggle("grid", vt === "grid")
+    b.classList.toggle("grid", vt === "grid")
   }
+}
+
+function reviewBadge() {
+  const b = document.querySelector<HTMLElement>("[data-review-badge]")
+  const v = store.get<{ day: string; n: number } | null>("kb-review-due", null)
+  if (b) b.textContent = v && v.day === todayIso() && v.n > 0 ? String(v.n) : ""
 }
 
 function setupReview() {
@@ -477,7 +477,7 @@ function setupReview() {
     input.checked = done.has(key)
     if (diff < 0) {
       li.hidden = true
-      if (!next) next = { d, t: li.querySelector(".td-t")?.textContent ?? "" }
+      if (!next) next = { d, t: li.querySelector(".row-t")?.textContent ?? "" }
       return
     }
     li.hidden = false
@@ -487,6 +487,7 @@ function setupReview() {
   })
   const count = document.querySelector<HTMLElement>("[data-review-count]")
   if (count) count.textContent = String(due)
+  store.set("kb-review-due", { day: today, n: due })
   const visible = box.querySelectorAll("li:not([hidden])").length
   box.hidden = visible === 0
   const empty = document.querySelector<HTMLElement>("[data-review-empty]")
@@ -580,6 +581,7 @@ function bindGlobal() {
     else done.delete(key)
     store.set("kb-review-done", [...done].slice(-300))
     setupReview()
+    reviewBadge()
   })
 
   document.addEventListener("input", (ev) => {
@@ -651,6 +653,7 @@ function onNav() {
   enhanceCode()
   recordOpened()
   setupReview()
+  reviewBadge()
   setupHome()
 
   const bar = document.querySelector<HTMLElement>("[data-progress]")

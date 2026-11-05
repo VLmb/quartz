@@ -21,14 +21,7 @@ async function precache() {
     const u = new URL(m[1], BASE)
     if (u.origin === self.location.origin && isAsset(u)) urls.add(u.href)
   }
-  for (const f of [
-    "JetBrainsMono-normal-cyrillic",
-    "JetBrainsMono-normal-latin",
-    "JetBrainsMono-italic-cyrillic",
-    "JetBrainsMono-italic-latin",
-    "Onest-normal-cyrillic",
-    "Onest-normal-latin",
-  ])
+  for (const f of ["InterVariable", "JetBrainsMono-normal-cyrillic", "JetBrainsMono-normal-latin"])
     urls.add(new URL(`static/fonts/${f}.woff2`, BASE).href)
   try {
     const idxUrl = new URL("static/contentIndex.json", BASE).href
