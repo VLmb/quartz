@@ -10,7 +10,9 @@ export { SvgEmbedFix, GitHistory, PWA } from "./plugins"
 // Тема выставляется до отрисовки страницы, чтобы не было вспышки. По умолчанию — тёмная.
 const themeScript = `(function(){var t;try{t=localStorage.getItem("theme")}catch(e){}
 if(t!=="light"&&t!=="dark")t="dark";
-document.documentElement.setAttribute("saved-theme",t)})()`
+var s;try{s=localStorage.getItem("skin")}catch(e){}
+if(s!=="console")s="linear";
+document.documentElement.setAttribute("saved-theme",t);document.documentElement.setAttribute("data-skin",s)})()`
 
 /**
  * Верхняя полоса темы. Заодно несёт стили и скрипты всей темы,

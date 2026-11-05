@@ -107,6 +107,27 @@ function setTheme(t: "light" | "dark") {
     .forEach((m) => m.setAttribute("content", t === "dark" ? "#08090a" : "#ffffff"))
   document.dispatchEvent(new CustomEvent("themechange", { detail: { theme: t } }))
 }
+/* ───────────── оформление: Linear / «Консоль» ───────────── */
+function currentSkin(): "linear" | "console" {
+  return html.getAttribute("data-skin") === "console" ? "console" : "linear"
+}
+function markSkin() {
+  const skin = currentSkin()
+  document
+    .querySelectorAll<HTMLElement>("[data-skin-set]")
+    .forEach((b) => b.classList.toggle("on", b.dataset.skinSet === skin))
+}
+function setSkin(skin: "linear" | "console") {
+  html.setAttribute("data-skin", skin)
+  try {
+    localStorage.setItem("skin", skin)
+  } catch {}
+  markSkin()
+  // граф перечитывает цвета на событие смены темы
+  const t = html.getAttribute("saved-theme") === "light" ? "light" : "dark"
+  document.dispatchEvent(new CustomEvent("themechange", { detail: { theme: t } }))
+}
+
 function toggleTheme() {
   const next = html.getAttribute("saved-theme") === "dark" ? "light" : "dark"
   const d = document as Document & { startViewTransition?: (cb: () => void) => unknown }
@@ -512,6 +533,15 @@ function bindGlobal() {
       toggleTheme()
       return
     }
+    const skinSet = t.closest<HTMLElement>("[data-skin-set]")
+    if (skinSet) {
+      setSkin(skinSet.dataset.skinSet === "console" ? "console" : "linear")
+      return
+    }
+    if (t.closest("[data-skin-toggle]")) {
+      setSkin(currentSkin() === "console" ? "linear" : "console")
+      return
+    }
     if (t.closest("[data-search]")) {
       ev.preventDefault()
       html.classList.remove("drawer-open")
@@ -656,7 +686,8 @@ function onNav() {
   reviewBadge()
   setupHome()
 
-  const bar = document.querySelector<HTMLElement>("[data-progress]")
+  markSkin()
+  const bars = document.querySelectorAll<HTMLElement>("[data-progress]")
   const tocUpdate = setupToc()
   let raf = 0
   let saveTimer = 0
@@ -665,7 +696,7 @@ function onNav() {
     raf = requestAnimationFrame(() => {
       raf = 0
       const p = scrollProgress()
-      bar?.style.setProperty("--p", String(p))
+      bars.forEach((bar) => bar.style.setProperty("--p", String(p)))
       tocUpdate()
       clearTimeout(saveTimer)
       saveTimer = window.setTimeout(() => saveProgress(p), 400)

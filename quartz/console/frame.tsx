@@ -2,6 +2,12 @@ import { PageFrame, PageFrameProps } from "../components/frames/types"
 import { QuartzComponent } from "../components/types"
 import {
   Backlinks,
+  CActbar,
+  CCrumbs,
+  CFrontmatter,
+  CStatusbar,
+  CTabs,
+  CTitlebar,
   History,
   Home,
   MobileTabs,
@@ -16,7 +22,11 @@ import { pageKind, title } from "./data"
 import { Icon } from "./icons"
 
 /**
- * Каркас в стиле Linear: боковая панель (навигация и дерево заметок),
+ * Один каркас на два оформления (переключаются на клиенте атрибутом data-skin):
+ * Linear (по умолчанию) и «Консоль». Элементы .skin-l видны только в Linear,
+ * .skin-c — только в «Консоли».
+ *
+ * Linear: боковая панель (навигация и дерево заметок),
  * верхняя полоса с путём, контент и правая панель (свойства, содержание,
  * связи, история). На телефоне — нижние вкладки и выезжающая панель.
  */
@@ -43,9 +53,14 @@ export const ConsoleFrame: PageFrame = {
           : title(p.fileData)
     return (
       <div class="shell" data-kind={kind}>
+        <header class="titlebar skin-c">
+          <CTitlebar {...p} />
+        </header>
+        <CActbar {...p} />
         <Sidebar {...p} />
         <main class="main center">
-          <header class="topbar">{render(header)}</header>
+          <header class="topbar skin-l">{render(header)}</header>
+          <CTabs {...p} />
           {kind === "home" ? (
             <div class="view home">
               <Home {...p} />
@@ -57,6 +72,8 @@ export const ConsoleFrame: PageFrame = {
             </div>
           ) : (
             <div class="view note-view">
+              <CCrumbs {...p} />
+              {isNote && <CFrontmatter {...p} />}
               <h1 class="n-title">{heading}</h1>
               {isNote && <NoteMeta {...p} />}
               {isNote && <MobileToc {...p} />}
@@ -99,6 +116,7 @@ export const ConsoleFrame: PageFrame = {
         ) : (
           <div class="p-graph p-hidden">{render(right)}</div>
         )}
+        <CStatusbar {...p} />
         {render(footer)}
         <MobileTabs {...p} />
         <div class="drawer-backdrop" data-drawer-backdrop></div>

@@ -69,6 +69,7 @@ function Tags({ f, from }: { f: QuartzPluginData; from?: string }) {
 /* ───────────── верхняя панель (над контентом) ───────────── */
 
 export function Topbar(props: P) {
+  // видна только в оформлении Linear
   const { fileData, cfg } = props
   return (
     <>
@@ -266,6 +267,14 @@ export function Sidebar({ fileData, allFiles, cfg }: P) {
           <i></i>
           <Ago ts={lastUpdate(allFiles)} prefix="обновлено " />
         </span>
+        <div class="skin-seg" role="group" aria-label="Оформление">
+          <button type="button" data-skin-set="linear">
+            Linear
+          </button>
+          <button type="button" data-skin-set="console">
+            Консоль
+          </button>
+        </div>
       </div>
     </aside>
   )
@@ -278,7 +287,7 @@ export function NoteMeta({ fileData }: P) {
   const slug = fileData.slug ?? ""
   const folderSlug = slug.split("/").slice(0, -1).join("/")
   return (
-    <div class="n-meta">
+    <div class="n-meta skin-l">
       {folder && (
         <a class="badge" href={folderHref(slug, folderSlug)}>
           <Icon name="folder" />
@@ -295,13 +304,14 @@ export function NoteMeta({ fileData }: P) {
 }
 
 export function Properties({ fileData }: P) {
+  // только в оформлении Linear
   const slug = fileData.slug ?? ""
   const created = fileData.dates?.created ? new Date(fileData.dates.created).getTime() : 0
   const modified = modifiedTs(fileData)
   const review = reviewDate(fileData)
   const words = wordCount(fileData)
   return (
-    <section class="pane">
+    <section class="pane skin-l">
       <div class="pane-h">
         <span>Свойства</span>
       </div>
@@ -448,8 +458,8 @@ export function Home({ fileData, allFiles }: P) {
   return (
     <div class="home-wrap">
       <header class="hero">
-        <h1 class="display">База знаний</h1>
-        <p class="lede">
+        <h1 class="display skin-l">База знаний</h1>
+        <p class="lede skin-l">
           {all.length} {plural(all.length, "заметка", "заметки", "заметок")} в {folders.length}{" "}
           {plural(folders.length, "разделе", "разделах", "разделах")} ·{" "}
           <Ago ts={lastUpdate(allFiles)} prefix="обновлено " />
@@ -555,6 +565,233 @@ export function Home({ fileData, allFiles }: P) {
         </section>
       </div>
     </div>
+  )
+}
+
+/* ───────────── оформление «Консоль» (показывается только в нём) ───────────── */
+
+export function CTitlebar({ fileData, allFiles, cfg }: P) {
+  return (
+    <>
+      <a class="tb-logo" href={href(fileData.slug, "index")}>
+        <span class="tb-mark">
+          <Icon name="terminal" />
+        </span>
+        <b>{cfg.pageTitle}</b>
+        <span class="tb-path">~/knowledge</span>
+      </a>
+      <button class="cmd" data-search type="button">
+        <Icon name="search" />
+        <span>Найти заметку или тег</span>
+        <kbd>Ctrl K</kbd>
+      </button>
+      <div class="tb-right">
+        <span class="sync" title="Последнее изменение в базе">
+          <i></i>
+          <Ago ts={lastUpdate(allFiles)} prefix="обновлено " />
+        </span>
+        <span class="offline-badge" title="Нет сети — показываю сохранённую копию">
+          <Icon name="offline" />
+          офлайн
+        </span>
+        <button
+          class="tb-btn"
+          data-skin-toggle
+          type="button"
+          title="Переключить оформление: Linear / Консоль"
+          aria-label="Переключить оформление"
+        >
+          <Icon name="palette" />
+        </button>
+        <button class="tb-btn tt" data-theme-toggle type="button" aria-label="Сменить тему">
+          <Icon name="sun" cls="i-sun" />
+          <Icon name="moon" cls="i-moon" />
+        </button>
+      </div>
+      <span class="tb-progress" data-progress></span>
+    </>
+  )
+}
+
+/* ───────────── панель активности ───────────── */
+
+export function CActbar({ fileData }: P) {
+  const kind = pageKind(fileData.slug)
+  return (
+    <nav class="actbar skin-c">
+      <a
+        href={href(fileData.slug, "index")}
+        class={`act ${kind !== "tag" ? "on" : ""}`}
+        title="Файлы"
+      >
+        <Icon name="file" />
+      </a>
+      <button type="button" data-search class="act" title="Поиск (Ctrl K)">
+        <Icon name="search" />
+      </button>
+      <button type="button" data-global-graph class="act" title="Граф связей (Ctrl G)">
+        <Icon name="graph" />
+      </button>
+      <a href={href(fileData.slug, "index") + "#review"} class="act" title="Повторение">
+        <Icon name="repeat" />
+      </a>
+      <a
+        href={href(fileData.slug, "tags/index")}
+        class={`act ${kind === "tag" ? "on" : ""}`}
+        title="Теги"
+      >
+        <Icon name="tag" />
+      </a>
+    </nav>
+  )
+}
+
+/* ───────────── вкладки ───────────── */
+
+export function CTabs({ fileData }: P) {
+  const kind = pageKind(fileData.slug)
+  const label =
+    kind === "note"
+      ? `${title(fileData)}.md`
+      : kind === "folder"
+        ? `${title(fileData)}/`
+        : kind === "tag"
+          ? `#${title(fileData)}`
+          : null
+  return (
+    <div class="tabs skin-c">
+      <a href={href(fileData.slug, "index")} class={`tab ${kind === "home" ? "on" : ""}`}>
+        <Icon name="home" />
+        Главная
+      </a>
+      {label && (
+        <span class="tab on">
+          <Icon name={kind === "folder" ? "folder" : kind === "tag" ? "tag" : "file"} />
+          <span class="tab-t">{label}</span>
+          <a class="x" href={href(fileData.slug, "index")} aria-label="Закрыть">
+            <Icon name="x" />
+          </a>
+        </span>
+      )}
+    </div>
+  )
+}
+
+/* ───────────── шапка заметки ───────────── */
+
+export function CCrumbs({ fileData, allFiles, cfg }: P) {
+  const slug = fileData.slug ?? ""
+  const kind = pageKind(slug)
+  const names = folderNames(allFiles)
+  const parts = slug.split("/")
+  const dirSlugs =
+    kind === "folder" ? parts.slice(0, -2) : kind === "note" ? parts.slice(0, -1) : []
+  const crumbs = dirSlugs.map((_, i) => dirSlugs.slice(0, i + 1).join("/"))
+  const last =
+    kind === "note"
+      ? `${title(fileData)}.md`
+      : kind === "folder"
+        ? `${title(fileData)}/`
+        : title(fileData)
+  return (
+    <nav class="v-crumbs skin-c">
+      <a href={href(slug, "index")}>{cfg.pageTitle}</a>
+      {kind === "tag" && (
+        <>
+          <span>/</span>
+          <a href={href(slug, "tags/index")}>теги</a>
+        </>
+      )}
+      {crumbs.map((c) => (
+        <>
+          <span>/</span>
+          <a href={folderHref(slug, c)}>{names.get(c) ?? c}</a>
+        </>
+      ))}
+      {slug !== "tags/index" && (
+        <>
+          <span>/</span>
+          <b>{last}</b>
+        </>
+      )}
+    </nav>
+  )
+}
+
+export function CFrontmatter({ fileData }: P) {
+  const t = tags(fileData)
+  const created = fileData.dates?.created ? new Date(fileData.dates.created).getTime() : 0
+  const modified = modifiedTs(fileData)
+  const review = reviewDate(fileData)
+  return (
+    <pre class="fm skin-c">
+      <span class="fm-d">---</span>
+      {"\n"}
+      {t.length > 0 && (
+        <>
+          <span class="fm-k">tags:</span> [
+          {t.map((tag, i) => (
+            <>
+              {i > 0 && ", "}
+              <a class="fm-tag" href={tagHref(fileData.slug, tag)}>
+                {tag}
+              </a>
+            </>
+          ))}
+          ]{"\n"}
+        </>
+      )}
+      {created > 0 && (
+        <>
+          <span class="fm-k">created:</span> <span class="fm-n">{isoDay(created)}</span>
+          {"\n"}
+        </>
+      )}
+      {modified > 0 && (
+        <>
+          <span class="fm-k">updated:</span> <Ago ts={modified} />
+          {"\n"}
+        </>
+      )}
+      {review && (
+        <>
+          <span class="fm-k">review:</span> <span class="fm-n">{review}</span>
+          {"\n"}
+        </>
+      )}
+      <span class="fm-d">---</span>
+    </pre>
+  )
+}
+
+export function CStatusbar({ fileData, allFiles }: P) {
+  const kind = pageKind(fileData.slug)
+  return (
+    <footer class="statusbar skin-c">
+      <span class="sb-item">
+        <Icon name="branch" />
+        main
+      </span>
+      <span class="sb-item">
+        <Icon name="sync" />
+        <Ago ts={lastUpdate(allFiles)} />
+      </span>
+      <span class="sb-item">{notes(allFiles).length} заметок</span>
+      <span class="sb-sp"></span>
+      {kind === "note" && (
+        <>
+          <span class="sb-item">{wordCount(fileData)} слов</span>
+          <span class="sb-item">{readingMinutes(fileData)} мин чтения</span>
+        </>
+      )}
+      <button class="sb-item" type="button" data-skin-toggle title="Переключить оформление">
+        <Icon name="palette" />
+        Консоль
+      </button>
+      <button class="sb-item" type="button" data-theme-toggle>
+        <span class="sb-theme"></span>
+      </button>
+    </footer>
   )
 }
 
