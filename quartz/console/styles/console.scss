@@ -846,6 +846,10 @@ html.is-offline .sync {
     &.broken {
       color: var(--muted);
       opacity: 1;
+      background: none;
+      text-decoration: underline dashed;
+      text-underline-offset: 3px;
+      cursor: help;
     }
   }
   a.external .external-icon {
