@@ -281,3 +281,42 @@ html[data-panel="off"] .shell .panel {
     bottom: calc(80px + env(safe-area-inset-bottom));
   }
 }
+
+/* ───────────── цветные заголовки H1 / H2 ───────────── */
+// Свои цвета для каждого оформления и темы; H1 (и название заметки) и H2 — разные.
+html:not([data-skin]),
+html[data-skin="linear"] {
+  --h1: #a4a7ff;
+  --h2: #4cc9d9;
+  &[saved-theme="light"] {
+    --h1: #5154d6;
+    --h2: #0b7f8c;
+  }
+}
+html[data-skin="github"] {
+  --h1: #d2a8ff;
+  --h2: #7ee787;
+  &[saved-theme="light"] {
+    --h1: #8250df;
+    --h2: #1a7f37;
+  }
+}
+html[data-skin="console"] {
+  --h1: #a6d189;
+  --h2: #d4a876;
+  &[saved-theme="light"] {
+    --h1: #3d7a28;
+    --h2: #8a5a2b;
+  }
+}
+:root:root {
+  .shell .n-title,
+  .prose h1,
+  .kbe .cm-h1 {
+    color: var(--h1);
+  }
+  .prose h2,
+  .kbe .cm-h2 {
+    color: var(--h2);
+  }
+}
