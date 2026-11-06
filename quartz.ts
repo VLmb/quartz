@@ -29,7 +29,7 @@ const consoleLayout = {
   frame: "console",
   header: [ConsoleChrome(undefined)],
   left: [],
-  right: base.defaults.right ?? [],
+  right: [],
   beforeBody: [],
   afterBody: [],
   footer: [],

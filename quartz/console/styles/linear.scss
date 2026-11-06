@@ -113,7 +113,7 @@ html:not([data-skin="console"]) {
     background: var(--bg);
     color: var(--text);
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: calc(14px * var(--fs));
     font-weight: 400;
     line-height: 1.5;
     font-feature-settings:
@@ -183,7 +183,7 @@ html:not([data-skin="console"]) {
   }
   kbd {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: calc(11px * var(--fs));
     line-height: 1;
     letter-spacing: -0.013em;
     padding: 3px 5px;
@@ -236,8 +236,8 @@ html:not([data-skin="console"]) {
     border-radius: var(--r-pill);
     background: var(--pill);
     color: var(--text) !important;
-    font-size: 12px;
-    line-height: 18px;
+    font-size: calc(12px * var(--fs));
+    line-height: calc(18px * var(--fs));
     white-space: nowrap;
     transition: background 0.15s;
     span {
@@ -256,8 +256,8 @@ html:not([data-skin="console"]) {
     border-radius: var(--r-sm);
     background: var(--pill);
     color: var(--muted) !important;
-    font-size: 12px;
-    line-height: 20px;
+    font-size: calc(12px * var(--fs));
+    line-height: calc(20px * var(--fs));
     white-space: nowrap;
     .ic {
       width: 12px;
@@ -269,11 +269,11 @@ html:not([data-skin="console"]) {
   }
   .mono {
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     letter-spacing: -0.013em;
   }
   .count {
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     color: var(--faint);
     font-weight: 400;
     font-variant-numeric: tabular-nums;
@@ -305,7 +305,7 @@ html:not([data-skin="console"]) {
     padding: 10px 10px 0;
     background: var(--bg);
     border-right: 1px solid var(--line);
-    font-size: 13px;
+    font-size: calc(13px * var(--fs));
   }
   .sb-top {
     display: flex;
@@ -319,7 +319,7 @@ html:not([data-skin="console"]) {
     gap: 9px;
     color: var(--fg) !important;
     b {
-      font-size: 14px;
+      font-size: calc(14px * var(--fs));
       font-weight: 510;
       letter-spacing: -0.011em;
     }
@@ -363,7 +363,7 @@ html:not([data-skin="console"]) {
     background: var(--field) !important;
     box-shadow: inset 0 0 0 1px var(--field-line);
     color: var(--muted) !important;
-    font-size: 13px;
+    font-size: calc(13px * var(--fs));
     text-align: left;
     transition: box-shadow 0.15s;
     .ic {
@@ -416,7 +416,7 @@ html:not([data-skin="console"]) {
   }
   .nav-n {
     margin-left: auto;
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     color: var(--muted);
     &:empty {
       display: none;
@@ -428,7 +428,7 @@ html:not([data-skin="console"]) {
     justify-content: space-between;
     min-height: 28px;
     padding: 10px 8px 4px;
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     font-weight: 510;
     color: var(--muted);
   }
@@ -506,7 +506,7 @@ html:not([data-skin="console"]) {
   .f-n {
     margin-left: auto;
     color: var(--faint);
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
   }
   .tree-empty {
     padding: 6px 8px;
@@ -519,7 +519,7 @@ html:not([data-skin="console"]) {
     padding: 10px 18px;
     background: var(--bg);
     border-top: 1px solid var(--line);
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     color: var(--faint);
   }
   .sb-foot {
@@ -538,7 +538,7 @@ html:not([data-skin="console"]) {
       flex: 1;
       height: 24px;
       border-radius: var(--r-sm);
-      font-size: 12px;
+      font-size: calc(12px * var(--fs));
       color: var(--muted) !important;
       transition:
         background 0.15s,
@@ -582,7 +582,7 @@ html:not([data-skin="console"]) {
     backdrop-filter: saturate(140%) blur(12px);
     -webkit-backdrop-filter: saturate(140%) blur(12px);
     border-bottom: 1px solid var(--line);
-    font-size: 13px;
+    font-size: calc(13px * var(--fs));
   }
   .crumbs {
     display: flex;
@@ -628,7 +628,7 @@ html:not([data-skin="console"]) {
     border-radius: var(--r-pill);
     background: color-mix(in srgb, var(--amber) 14%, transparent);
     color: var(--amber);
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     .ic {
       width: 13px;
       height: 13px;
@@ -663,7 +663,7 @@ html:not([data-skin="console"]) {
   .n-title {
     margin: 8px 0 12px;
     font-family: var(--font-sans);
-    font-size: 32px;
+    font-size: calc(32px * var(--fs));
     font-weight: 510;
     line-height: 1.13;
     letter-spacing: -0.022em;
@@ -676,7 +676,7 @@ html:not([data-skin="console"]) {
     align-items: center;
     gap: 6px 8px;
     margin-bottom: 28px;
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     color: var(--muted);
   }
   .meta-t {
@@ -692,7 +692,7 @@ html:not([data-skin="console"]) {
 
   /* ───────────── текст заметки ───────────── */
   .prose {
-    font-size: 16px;
+    font-size: calc(16px * var(--fs));
     line-height: 1.6;
     color: var(--text);
     article {
@@ -709,7 +709,7 @@ html:not([data-skin="console"]) {
     }
     & .markdown-rendered > p:first-child,
     & article > p:first-child {
-      font-size: 17px;
+      font-size: calc(17px * var(--fs));
       color: var(--fg);
       font-weight: 400;
       margin-bottom: 1.2em;
@@ -728,27 +728,27 @@ html:not([data-skin="console"]) {
       scroll-margin-top: calc(var(--top-h) + 24px);
     }
     h1 {
-      font-size: 28px;
+      font-size: calc(28px * var(--fs));
       font-weight: 510;
       letter-spacing: -0.022em;
       margin: 1.8em 0 0.5em;
     }
     h2 {
-      font-size: 24px;
+      font-size: calc(24px * var(--fs));
       font-weight: 510;
       line-height: 1.33;
       letter-spacing: -0.012em;
       margin: 2em 0 0.5em;
     }
     h3 {
-      font-size: 19px;
+      font-size: calc(19px * var(--fs));
       font-weight: 590;
       line-height: 1.33;
       letter-spacing: -0.012em;
       margin: 1.7em 0 0.45em;
     }
     h4 {
-      font-size: 16px;
+      font-size: calc(16px * var(--fs));
       font-weight: 590;
       margin: 1.4em 0 0.4em;
     }
@@ -879,7 +879,7 @@ html:not([data-skin="console"]) {
       background: var(--img-bg);
     }
     .footnotes {
-      font-size: 14px;
+      font-size: calc(14px * var(--fs));
       color: var(--muted);
     }
   }
@@ -890,7 +890,7 @@ html:not([data-skin="console"]) {
     border-radius: var(--r-card);
     background: var(--bg2);
     box-shadow: inset 0 0 0 1px var(--line);
-    font-size: 14px;
+    font-size: calc(14px * var(--fs));
     overflow-x: auto;
     & > table {
       margin: 0;
@@ -904,7 +904,7 @@ html:not([data-skin="console"]) {
   }
   .prose th {
     text-align: left;
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     color: var(--muted);
     font-weight: 510;
     padding: 10px 14px;
@@ -944,7 +944,7 @@ html:not([data-skin="console"]) {
     height: 36px;
     padding: 0 8px 0 14px;
     border-bottom: 1px solid var(--line);
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     color: var(--muted);
   }
   .code-lang {
@@ -974,7 +974,7 @@ html:not([data-skin="console"]) {
     padding: 0 8px !important;
     border-radius: var(--r);
     color: var(--muted) !important;
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     transition:
       background 0.15s,
       color 0.15s;
@@ -1017,7 +1017,7 @@ html:not([data-skin="console"]) {
     & > code {
       display: grid;
       padding: 0;
-      font-size: 13px;
+      font-size: calc(13px * var(--fs));
       line-height: 1.7;
       letter-spacing: -0.013em;
       background: none;
@@ -1115,7 +1115,7 @@ html:not([data-skin="console"]) {
       align-items: center;
       gap: 10px;
       padding: 12px 16px;
-      font-size: 14px;
+      font-size: calc(14px * var(--fs));
       font-weight: 510;
       color: var(--fg);
       --color: var(--cc);
@@ -1141,7 +1141,7 @@ html:not([data-skin="console"]) {
     }
     & > .callout-content {
       padding: 0 16px 0 42px;
-      font-size: 15px;
+      font-size: calc(15px * var(--fs));
       color: var(--text);
       display: grid;
       transition: grid-template-rows 0.35s var(--ease);
@@ -1205,7 +1205,7 @@ html:not([data-skin="console"]) {
     padding: 8px 12px 24px;
     border-left: 1px solid var(--line);
     background: var(--bg);
-    font-size: 13px;
+    font-size: calc(13px * var(--fs));
   }
   .pane {
     padding-bottom: 8px;
@@ -1222,12 +1222,12 @@ html:not([data-skin="console"]) {
     align-items: start;
     dt {
       color: var(--muted);
-      line-height: 22px;
+      line-height: calc(22px * var(--fs));
     }
     dd {
       margin: 0;
       color: var(--text);
-      line-height: 22px;
+      line-height: calc(22px * var(--fs));
       min-width: 0;
     }
   }
@@ -1282,13 +1282,13 @@ html:not([data-skin="console"]) {
     position: relative;
     padding: 4px 8px 4px 12px;
     color: var(--muted) !important;
-    font-size: 13px;
+    font-size: calc(13px * var(--fs));
     line-height: 1.4;
     border-radius: var(--r);
     transition: color 0.15s;
     &.toc-h3 {
       padding-left: 24px;
-      font-size: 12.5px;
+      font-size: calc(12.5px * var(--fs));
     }
     &:hover {
       color: var(--fg) !important;
@@ -1327,7 +1327,7 @@ html:not([data-skin="console"]) {
   }
   .hash {
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     letter-spacing: -0.013em;
     color: var(--faint);
     line-height: 1.55;
@@ -1337,7 +1337,7 @@ html:not([data-skin="console"]) {
   }
   .h-when {
     grid-column: 2;
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     color: var(--faint);
   }
 
@@ -1367,7 +1367,7 @@ html:not([data-skin="console"]) {
     gap: 10px;
     min-height: 40px;
     padding: 8px 14px;
-    font-size: 13px;
+    font-size: calc(13px * var(--fs));
     color: var(--text) !important;
     transition: background 0.12s;
     &:hover {
@@ -1380,7 +1380,7 @@ html:not([data-skin="console"]) {
       flex-wrap: nowrap;
     }
     .pill {
-      font-size: 11.5px;
+      font-size: calc(11.5px * var(--fs));
       padding: 0 8px;
     }
   }
@@ -1411,7 +1411,7 @@ html:not([data-skin="console"]) {
     min-width: 64px;
     text-align: right;
     color: var(--faint);
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     font-variant-numeric: tabular-nums;
   }
   .row-k {
@@ -1459,7 +1459,7 @@ html:not([data-skin="console"]) {
     }
     .row-t {
       grid-area: t;
-      font-size: 15px;
+      font-size: calc(15px * var(--fs));
       white-space: normal;
     }
     .row-x {
@@ -1540,7 +1540,7 @@ html:not([data-skin="console"]) {
     text-decoration-color: var(--line2);
   }
   .td-d {
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     color: var(--faint);
     white-space: nowrap;
     &.late {
@@ -1558,7 +1558,7 @@ html:not([data-skin="console"]) {
   .display {
     margin: 0 0 12px;
     font-family: var(--font-sans);
-    font-size: 48px;
+    font-size: calc(48px * var(--fs));
     font-weight: 510;
     line-height: 1;
     letter-spacing: -0.022em;
@@ -1566,7 +1566,7 @@ html:not([data-skin="console"]) {
   }
   .lede {
     margin: 0 0 28px;
-    font-size: 16px;
+    font-size: calc(16px * var(--fs));
     color: var(--muted);
   }
   .big-search {
@@ -1580,7 +1580,7 @@ html:not([data-skin="console"]) {
     background: var(--field) !important;
     box-shadow: inset 0 0 0 1px var(--field-line);
     color: var(--muted) !important;
-    font-size: 15px;
+    font-size: calc(15px * var(--fs));
     text-align: left;
     transition: box-shadow 0.15s;
     .ic {
@@ -1602,7 +1602,7 @@ html:not([data-skin="console"]) {
     margin-top: 14px;
     .pill {
       padding: 4px 12px;
-      font-size: 13px;
+      font-size: calc(13px * var(--fs));
     }
   }
   .continue {
@@ -1620,13 +1620,13 @@ html:not([data-skin="console"]) {
     }
   }
   .cont-label {
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     font-weight: 510;
     color: var(--muted);
   }
   .cont-t {
     margin: 2px 0 4px;
-    font-size: 24px;
+    font-size: calc(24px * var(--fs));
     font-weight: 510;
     line-height: 1.25;
     letter-spacing: -0.012em;
@@ -1635,7 +1635,7 @@ html:not([data-skin="console"]) {
   .cont-x {
     margin: 0;
     color: var(--muted);
-    font-size: 14px;
+    font-size: calc(14px * var(--fs));
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -1647,7 +1647,7 @@ html:not([data-skin="console"]) {
     align-items: center;
     gap: 12px;
     margin-top: 8px;
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     color: var(--faint);
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
@@ -1673,7 +1673,7 @@ html:not([data-skin="console"]) {
     border-radius: var(--r);
     background: var(--accent) !important;
     color: var(--accent-fg) !important;
-    font-size: 14px;
+    font-size: calc(14px * var(--fs));
     font-weight: 510;
     letter-spacing: -0.011em;
     white-space: nowrap;
@@ -1704,7 +1704,7 @@ html:not([data-skin="console"]) {
   .sec-t {
     margin: 0 !important;
     font-family: var(--font-sans);
-    font-size: 15px !important;
+    font-size: calc(15px * var(--fs)) !important;
     font-weight: 510 !important;
     letter-spacing: -0.011em;
     color: var(--fg) !important;
@@ -1729,7 +1729,7 @@ html:not([data-skin="console"]) {
       height: 22px;
       padding: 0 10px !important;
       border-radius: var(--r-sm);
-      font-size: 12px;
+      font-size: calc(12px * var(--fs));
       color: var(--muted) !important;
       transition:
         background 0.15s,
@@ -1757,7 +1757,7 @@ html:not([data-skin="console"]) {
     align-items: center;
     gap: 4px;
     color: var(--faint);
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
   }
   .two {
     display: grid;
@@ -1770,13 +1770,13 @@ html:not([data-skin="console"]) {
     border-radius: var(--r-card);
     box-shadow: inset 0 0 0 1px var(--line);
     color: var(--muted);
-    font-size: 13px;
+    font-size: calc(13px * var(--fs));
     &[hidden] {
       display: none;
     }
     code {
       font-family: var(--font-mono);
-      font-size: 12px;
+      font-size: calc(12px * var(--fs));
       background: var(--pill);
       padding: 1px 5px;
       border-radius: var(--r-sm);
@@ -1786,7 +1786,7 @@ html:not([data-skin="console"]) {
   .readme {
     margin-top: 56px;
     .prose {
-      font-size: 14px;
+      font-size: calc(14px * var(--fs));
       color: var(--muted);
       & article > p:first-child,
       & .markdown-rendered > p:first-child {
@@ -1798,10 +1798,10 @@ html:not([data-skin="console"]) {
 
   /* страницы папок и тегов (списки Quartz) */
   .prose.listing {
-    font-size: 14px;
+    font-size: calc(14px * var(--fs));
     color: var(--muted);
     & > article > p:first-child {
-      font-size: 14px;
+      font-size: calc(14px * var(--fs));
       color: var(--muted);
     }
     ul.section-ul {
@@ -1836,7 +1836,7 @@ html:not([data-skin="console"]) {
         }
         .desc h3 {
           margin: 0;
-          font-size: 14px;
+          font-size: calc(14px * var(--fs));
           font-weight: 510;
           letter-spacing: 0;
           a {
@@ -1857,14 +1857,14 @@ html:not([data-skin="console"]) {
             margin: 0;
           }
           a.tag-link {
-            font-size: 11.5px;
+            font-size: calc(11.5px * var(--fs));
           }
         }
         .meta {
           grid-column: 3;
           grid-row: 1;
           margin: 0;
-          font-size: 12px;
+          font-size: calc(12px * var(--fs));
           color: var(--faint);
           opacity: 1;
           white-space: nowrap;
@@ -1873,7 +1873,7 @@ html:not([data-skin="console"]) {
     }
     h2,
     h3 {
-      font-size: 15px;
+      font-size: calc(15px * var(--fs));
     }
   }
 
@@ -1933,7 +1933,7 @@ html:not([data-skin="console"]) {
     flex: 1;
     min-width: 0;
     font-family: var(--font-sans);
-    font-size: 16px;
+    font-size: calc(16px * var(--fs));
     letter-spacing: -0.011em;
     background: none;
     border: 0;
@@ -1949,7 +1949,7 @@ html:not([data-skin="console"]) {
     padding: 6px;
   }
   .palette-group {
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     font-weight: 510;
     color: var(--muted);
     padding: 8px 10px 4px;
@@ -1984,21 +1984,21 @@ html:not([data-skin="console"]) {
   }
   .palette-title {
     font-weight: 510;
-    font-size: 14px;
+    font-size: calc(14px * var(--fs));
     color: var(--fg);
   }
   .palette-ex {
-    font-size: 12.5px;
+    font-size: calc(12.5px * var(--fs));
     color: var(--muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .palette-topic {
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     color: var(--muted);
     padding: 0 6px;
-    line-height: 20px;
+    line-height: calc(20px * var(--fs));
     border-radius: var(--r-sm);
     background: var(--pill);
     white-space: nowrap;
@@ -2016,7 +2016,7 @@ html:not([data-skin="console"]) {
     padding: 0 16px;
     height: 38px;
     border-top: 1px solid var(--line);
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     color: var(--faint);
     kbd {
       margin-right: 2px;
@@ -2042,7 +2042,7 @@ html:not([data-skin="console"]) {
     max-height: 22rem !important;
     padding: 4px 20px !important;
     & > .popover-hint {
-      font-size: 14px;
+      font-size: calc(14px * var(--fs));
     }
     h1,
     h2,
@@ -2056,7 +2056,7 @@ html:not([data-skin="console"]) {
       display: none;
     }
     pre {
-      font-size: 12px;
+      font-size: calc(12px * var(--fs));
     }
   }
 
@@ -2121,23 +2121,23 @@ html:not([data-skin="console"]) {
       padding-top: 24px;
     }
     .display {
-      font-size: 32px;
+      font-size: calc(32px * var(--fs));
       letter-spacing: -0.022em;
     }
     .lede {
-      font-size: 14px;
+      font-size: calc(14px * var(--fs));
       margin-bottom: 20px;
     }
     .n-title {
-      font-size: 26px;
+      font-size: calc(26px * var(--fs));
     }
     .prose {
-      font-size: 16px;
+      font-size: calc(16px * var(--fs));
       h2 {
-        font-size: 21px;
+        font-size: calc(21px * var(--fs));
       }
       h3 {
-        font-size: 18px;
+        font-size: calc(18px * var(--fs));
       }
     }
     .prose pre > code > [data-line]::before {
@@ -2153,7 +2153,7 @@ html:not([data-skin="console"]) {
       border-radius: var(--r-card);
       background: var(--bg2);
       box-shadow: inset 0 0 0 1px var(--line);
-      font-size: 13px;
+      font-size: calc(13px * var(--fs));
       summary {
         list-style: none;
         display: flex;
@@ -2200,7 +2200,7 @@ html:not([data-skin="console"]) {
       }
     }
     .cont-t {
-      font-size: 20px;
+      font-size: calc(20px * var(--fs));
     }
     .sec {
       margin-top: 32px;
@@ -2247,7 +2247,7 @@ html:not([data-skin="console"]) {
       padding-top: calc(10px + env(safe-area-inset-top));
       transform: translateX(-102%);
       transition: transform 0.3s var(--ease);
-      font-size: 14px;
+      font-size: calc(14px * var(--fs));
       .f-dir,
       .f-file,
       .nav-i {
@@ -2295,7 +2295,7 @@ html:not([data-skin="console"]) {
       align-items: center;
       gap: 3px;
       padding: 7px 0 5px !important;
-      font-size: 10.5px;
+      font-size: calc(10.5px * var(--fs));
       font-weight: 510;
       color: var(--faint) !important;
       border-radius: var(--r);

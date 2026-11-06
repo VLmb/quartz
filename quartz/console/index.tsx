@@ -8,12 +8,14 @@ export { ConsoleFrame } from "./frame"
 export { SvgEmbedFix, GitHistory, PWA } from "./plugins"
 export { EditorBundle, buildEditorBundle } from "./editorBundle"
 
-// Тема выставляется до отрисовки страницы, чтобы не было вспышки. По умолчанию — тёмная.
-const themeScript = `(function(){var t;try{t=localStorage.getItem("theme")}catch(e){}
-if(t!=="light"&&t!=="dark")t="dark";
-var s;try{s=localStorage.getItem("skin")}catch(e){}
-if(s!=="console")s="linear";
-document.documentElement.setAttribute("saved-theme",t);document.documentElement.setAttribute("data-skin",s)})()`
+// Тема, оформление и настройки вида выставляются до отрисовки страницы, чтобы не было вспышки.
+const themeScript = `(function(){var d=document.documentElement;function g(k){try{return localStorage.getItem(k)}catch(e){return null}}
+var t=g("theme");if(t!=="light"&&t!=="dark")t="dark";
+var s=g("skin");if(s!=="console")s="linear";
+d.setAttribute("saved-theme",t);d.setAttribute("data-skin",s);
+var w=g("kb-width");if(/^(narrow|wide|full)$/.test(w||""))d.setAttribute("data-width",w);
+var f=g("kb-fs");if(/^(s|l|xl)$/.test(f||""))d.setAttribute("data-fs",f);
+if(g("kb-panel")==="off")d.setAttribute("data-panel","off")})()`
 
 /**
  * Верхняя полоса темы. Заодно несёт стили и скрипты всей темы,

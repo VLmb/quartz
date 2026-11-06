@@ -15,7 +15,6 @@ import {
   pageKind,
   pathSegments,
   readingMinutes,
-  reviewDate,
   shortDate,
   tagHref,
   tags,
@@ -96,15 +95,28 @@ export function Topbar(props: P) {
             Редактировать
           </button>
         )}
-        <button
-          type="button"
-          class="icon-btn d-only"
-          data-global-graph
-          title="Граф связей (Ctrl G)"
-          aria-label="Граф связей"
-        >
-          <Icon name="graph" />
-        </button>
+        {pageKind(fileData.slug) === "note" && (
+          <>
+            <button
+              type="button"
+              class="icon-btn"
+              data-share
+              title="Поделиться ссылкой"
+              aria-label="Поделиться"
+            >
+              <Icon name="share" />
+            </button>
+            <button
+              type="button"
+              class="icon-btn d-only panel-toggle"
+              data-panel-toggle
+              title="Правая панель ( ] )"
+              aria-label="Показать или скрыть правую панель"
+            >
+              <Icon name="panelRight" />
+            </button>
+          </>
+        )}
         <a class="m-only tb-home" href={href(fileData.slug, "index")} aria-label={cfg.pageTitle}>
           <span class="mark">
             <Icon name="terminal" />
@@ -285,15 +297,6 @@ export function Sidebar({ fileData, allFiles, cfg }: P) {
           <Icon name="home" />
           Главная
         </a>
-        <a href={href(current, "index") + "#review"} class="nav-i">
-          <Icon name="repeat" />
-          Повторение
-          <span class="nav-n" data-review-badge></span>
-        </a>
-        <button type="button" class="nav-i" data-global-graph>
-          <Icon name="graph" />
-          Граф связей
-        </button>
         <a href={href(current, "tags/index")} class={`nav-i ${kind === "tag" ? "on" : ""}`}>
           <Icon name="hash" />
           Теги
@@ -322,14 +325,10 @@ export function Sidebar({ fileData, allFiles, cfg }: P) {
           <i></i>
           <Ago ts={lastUpdate(allFiles)} prefix="обновлено " />
         </span>
-        <div class="skin-seg" role="group" aria-label="Оформление">
-          <button type="button" data-skin-set="linear">
-            Linear
-          </button>
-          <button type="button" data-skin-set="console">
-            Консоль
-          </button>
-        </div>
+        <button type="button" class="sb-settings" data-settings title="Настройки ( , )">
+          <Icon name="sliders" />
+          Настройки
+        </button>
       </div>
     </aside>
   )
@@ -363,7 +362,6 @@ export function Properties({ fileData }: P) {
   const slug = fileData.slug ?? ""
   const created = fileData.dates?.created ? new Date(fileData.dates.created).getTime() : 0
   const modified = modifiedTs(fileData)
-  const review = reviewDate(fileData)
   const words = wordCount(fileData)
   return (
     <section class="pane skin-l">
@@ -391,12 +389,6 @@ export function Properties({ fileData }: P) {
           <>
             <dt>Создано</dt>
             <dd class="mono">{isoDay(created)}</dd>
-          </>
-        )}
-        {review && (
-          <>
-            <dt>Повторить</dt>
-            <dd class="mono">{review}</dd>
           </>
         )}
         <dt>Объём</dt>
@@ -505,10 +497,6 @@ export function Home({ fileData, allFiles }: P) {
   const all = notes(allFiles)
   const recent = [...all].sort((a, b) => modifiedTs(b) - modifiedTs(a)).slice(0, 8)
   const pinned = all.filter(isPinned).sort((a, b) => title(a).localeCompare(title(b), "ru"))
-  const review = all
-    .map((f) => ({ f, due: reviewDate(f) }))
-    .filter((x) => x.due)
-    .sort((a, b) => a.due!.localeCompare(b.due!))
   const folders = topFolders(allFiles)
   return (
     <div class="home-wrap">
@@ -571,7 +559,7 @@ export function Home({ fileData, allFiles }: P) {
         <div class="cards rows" data-cards-opened hidden></div>
       </section>
 
-      <div class="two">
+      <div>
         <section class="sec">
           <div class="sec-h">
             <h2 class="sec-t">Закреплённые</h2>
@@ -592,31 +580,6 @@ export function Home({ fileData, allFiles }: P) {
               Добавь <code>pinned: true</code> во frontmatter заметки.
             </p>
           )}
-        </section>
-        <section class="sec" id="review">
-          <div class="sec-h">
-            <h2 class="sec-t">Повторить сегодня</h2>
-            <span class="count" data-review-count></span>
-          </div>
-          <ul class="rows todo" data-review>
-            {review.map(({ f, due }) => (
-              <li data-due={due} data-slug={f.slug}>
-                <label class="row">
-                  <input type="checkbox" />
-                  <span class="box">
-                    <Icon name="check" />
-                  </span>
-                  <a class="row-t" href={href(from, f.slug!)}>
-                    {title(f)}
-                  </a>
-                  <span class="td-d">{due}</span>
-                </label>
-              </li>
-            ))}
-          </ul>
-          <p class="empty" data-review-empty hidden>
-            На сегодня всё. <span data-review-next></span>
-          </p>
         </section>
       </div>
     </div>
@@ -669,14 +632,36 @@ export function CTitlebar({ fileData, allFiles, cfg }: P) {
         >
           <Icon name="plus" />
         </button>
+        {pageKind(fileData.slug) === "note" && (
+          <>
+            <button
+              class="tb-btn"
+              data-share
+              type="button"
+              title="Поделиться ссылкой"
+              aria-label="Поделиться"
+            >
+              <Icon name="share" />
+            </button>
+            <button
+              class="tb-btn panel-toggle"
+              data-panel-toggle
+              type="button"
+              title="Правая панель ( ] )"
+              aria-label="Показать или скрыть правую панель"
+            >
+              <Icon name="panelRight" />
+            </button>
+          </>
+        )}
         <button
           class="tb-btn"
-          data-skin-toggle
+          data-settings
           type="button"
-          title="Переключить оформление: Linear / Консоль"
-          aria-label="Переключить оформление"
+          title="Настройки ( , )"
+          aria-label="Настройки"
         >
-          <Icon name="palette" />
+          <Icon name="sliders" />
         </button>
         <button class="tb-btn tt" data-theme-toggle type="button" aria-label="Сменить тему">
           <Icon name="sun" cls="i-sun" />
@@ -704,12 +689,6 @@ export function CActbar({ fileData }: P) {
       <button type="button" data-search class="act" title="Поиск (Ctrl K)">
         <Icon name="search" />
       </button>
-      <button type="button" data-global-graph class="act" title="Граф связей (Ctrl G)">
-        <Icon name="graph" />
-      </button>
-      <a href={href(fileData.slug, "index") + "#review"} class="act" title="Повторение">
-        <Icon name="repeat" />
-      </a>
       <a
         href={href(fileData.slug, "tags/index")}
         class={`act ${kind === "tag" ? "on" : ""}`}
@@ -797,7 +776,6 @@ export function CFrontmatter({ fileData }: P) {
   const t = tags(fileData)
   const created = fileData.dates?.created ? new Date(fileData.dates.created).getTime() : 0
   const modified = modifiedTs(fileData)
-  const review = reviewDate(fileData)
   return (
     <pre class="fm skin-c">
       <span class="fm-d">---</span>
@@ -825,12 +803,6 @@ export function CFrontmatter({ fileData }: P) {
       {modified > 0 && (
         <>
           <span class="fm-k">updated:</span> <Ago ts={modified} />
-          {"\n"}
-        </>
-      )}
-      {review && (
-        <>
-          <span class="fm-k">review:</span> <span class="fm-n">{review}</span>
           {"\n"}
         </>
       )}
@@ -867,9 +839,9 @@ export function CStatusbar({ fileData, allFiles }: P) {
         <Icon name="logout" />
         <span data-account-login></span>
       </button>
-      <button class="sb-item" type="button" data-skin-toggle title="Переключить оформление">
-        <Icon name="palette" />
-        Консоль
+      <button class="sb-item" type="button" data-settings title="Настройки ( , )">
+        <Icon name="sliders" />
+        настройки
       </button>
       <button class="sb-item" type="button" data-theme-toggle>
         <span class="sb-theme"></span>
@@ -896,9 +868,9 @@ export function MobileTabs({ fileData }: P) {
         <Icon name="search" />
         <span>Поиск</span>
       </button>
-      <button type="button" data-global-graph class="mt">
-        <Icon name="graph" />
-        <span>Граф</span>
+      <button type="button" data-settings class="mt">
+        <Icon name="sliders" />
+        <span>Вид</span>
       </button>
       <button type="button" class="mt tt" data-theme-toggle>
         <Icon name="sun" cls="i-sun" />
@@ -936,6 +908,96 @@ export function Palette() {
           </span>
           <span class="palette-count" data-palette-count></span>
         </div>
+      </div>
+    </>
+  )
+}
+
+/* ───────────── настройки вида ───────────── */
+
+type Opt = { v: string; label: string; cls?: string }
+function SetRow({
+  label,
+  opt,
+  items,
+  cls,
+}: {
+  label: string
+  opt: string
+  items: Opt[]
+  cls?: string
+}) {
+  return (
+    <div class={`set-row ${cls ?? ""}`}>
+      <span class="set-l">{label}</span>
+      <div class="set-seg" role="radiogroup" aria-label={label} data-opt={opt}>
+        {items.map((o) => (
+          <button type="button" role="radio" data-v={o.v} class={o.cls}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export function Settings() {
+  return (
+    <>
+      <div class="set-backdrop" data-settings-close></div>
+      <div class="settings" role="dialog" aria-label="Настройки" data-settings-dialog>
+        <div class="set-h">
+          <b>Настройки</b>
+          <button type="button" class="set-x" data-settings-close aria-label="Закрыть">
+            <Icon name="x" />
+          </button>
+        </div>
+        <SetRow
+          label="Оформление"
+          opt="skin"
+          items={[
+            { v: "linear", label: "Linear" },
+            { v: "console", label: "Консоль" },
+          ]}
+        />
+        <SetRow
+          label="Тема"
+          opt="theme"
+          items={[
+            { v: "dark", label: "Тёмная" },
+            { v: "light", label: "Светлая" },
+          ]}
+        />
+        <SetRow
+          label="Ширина текста"
+          opt="width"
+          items={[
+            { v: "narrow", label: "Узкая" },
+            { v: "normal", label: "Обычная" },
+            { v: "wide", label: "Широкая" },
+            { v: "full", label: "Во всю" },
+          ]}
+        />
+        <SetRow
+          label="Размер шрифта"
+          opt="fs"
+          items={[
+            { v: "s", label: "A", cls: "fs-s" },
+            { v: "m", label: "A", cls: "fs-m" },
+            { v: "l", label: "A", cls: "fs-l" },
+            { v: "xl", label: "A", cls: "fs-xl" },
+          ]}
+        />
+        <SetRow
+          label="Правая панель"
+          opt="panel"
+          cls="set-desk"
+          items={[
+            { v: "on", label: "Показывать" },
+            { v: "off", label: "Скрыть" },
+          ]}
+        />
+        <p class="set-note">Сохраняется в этом браузере.</p>
       </div>
     </>
   )

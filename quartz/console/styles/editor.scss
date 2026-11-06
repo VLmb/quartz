@@ -83,7 +83,7 @@ html.kbe-open {
   border-radius: var(--ed-r);
   background: var(--ed-hover);
   color: var(--ed-fg);
-  font: 500 13px/1 var(--ed-ui);
+  font: 500 calc(13px * var(--fs))/1 var(--ed-ui);
   cursor: pointer;
   transition: background 0.15s;
   .ic {
@@ -106,7 +106,7 @@ html.kbe-open {
   border: 0;
   background: none;
   color: var(--ed-muted);
-  font: 13px var(--ed-ui);
+  font: calc(13px * var(--fs)) var(--ed-ui);
   cursor: pointer;
   text-align: left;
   .ic {
@@ -122,7 +122,7 @@ html.kbe-open {
   align-items: center;
   gap: 8px;
   color: var(--ed-text);
-  font: 13px var(--ed-ui);
+  font: calc(13px * var(--fs)) var(--ed-ui);
 }
 .acc-ava {
   width: 20px;
@@ -181,7 +181,7 @@ html.kbe-open {
   background: var(--ed-bg);
   color: var(--ed-text);
   font-family: var(--ed-ui);
-  font-size: 14px;
+  font-size: calc(14px * var(--fs));
   animation: kbe-in 0.18s ease-out;
   *,
   *::before,
@@ -265,7 +265,7 @@ html.kbe-open {
   border-radius: 999px;
   background: var(--ed-hover);
   color: var(--ed-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--fs));
   white-space: nowrap;
   &[data-state="dirty"],
   &[data-state="new"] {
@@ -294,7 +294,7 @@ html.kbe-open {
   background: var(--ed-hover);
   box-shadow: inset 0 0 0 1px var(--ed-line);
   color: var(--ed-fg);
-  font-size: 13px;
+  font-size: calc(13px * var(--fs));
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
@@ -307,7 +307,7 @@ html.kbe-open {
   &.sm {
     height: 26px;
     padding: 0 10px;
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
   }
   &.primary {
     background: var(--ed-accent);
@@ -358,7 +358,7 @@ html.kbe-open {
     border-radius: calc(var(--ed-r) - 2px);
     background: none;
     color: var(--ed-muted);
-    font-size: 12px;
+    font-size: calc(12px * var(--fs));
     cursor: pointer;
     &.on {
       background: var(--ed-panel2);
@@ -390,7 +390,7 @@ html.kbe-open {
   border-radius: var(--ed-r);
   background: none;
   color: var(--ed-muted);
-  font: 600 14px var(--ed-ui);
+  font: 600 calc(14px * var(--fs)) var(--ed-ui);
   cursor: pointer;
   flex: none;
   .ic {
@@ -424,7 +424,7 @@ html.kbe-open {
   border-bottom: 1px solid var(--ed-line);
   background: color-mix(in srgb, var(--ed-warn) 10%, var(--ed-panel));
   color: var(--ed-fg);
-  font-size: 13px;
+  font-size: calc(13px * var(--fs));
   &[hidden] {
     display: none;
   }
@@ -439,11 +439,51 @@ html.kbe-open {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, var(--split, 50%)) 0 minmax(0, 1fr);
+  &.resizing {
+    cursor: col-resize;
+    user-select: none;
+    .kbe-pane {
+      pointer-events: none;
+    }
+  }
+}
+.kbe-gutter {
+  position: relative;
+  z-index: 3;
+  width: 0;
+  outline: none;
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -5px;
+    width: 11px;
+    cursor: col-resize;
+  }
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -1px;
+    width: 3px;
+    background: var(--ed-indicator);
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+  }
+  &:hover::after,
+  &:focus-visible::after,
+  .resizing > &::after {
+    opacity: 0.7;
+  }
 }
 .kbe.no-preview .kbe-body {
   grid-template-columns: 1fr;
-  .kbe-preview {
+  .kbe-preview,
+  .kbe-gutter {
     display: none;
   }
 }
@@ -481,10 +521,10 @@ html.kbe-open {
   border-top: 1px solid var(--ed-line);
   background: var(--ed-panel);
   color: var(--ed-faint);
-  font-size: 12px;
+  font-size: calc(12px * var(--fs));
   font-variant-numeric: tabular-nums;
   kbd {
-    font-size: 10.5px;
+    font-size: calc(10.5px * var(--fs));
   }
 }
 
@@ -529,7 +569,7 @@ html.kbe-open {
 /* дифф при конфликте */
 .kbe-diff {
   font-family: var(--ed-mono);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--fs));
   line-height: 1.6;
 }
 .kbe-diff-h {
@@ -544,7 +584,7 @@ html.kbe-open {
   background: var(--ed-panel);
   border-bottom: 1px solid var(--ed-line);
   font-family: var(--ed-ui);
-  font-size: 12px;
+  font-size: calc(12px * var(--fs));
   span[data-t="theirs"] {
     color: var(--ed-danger);
   }
@@ -628,14 +668,14 @@ html.kbe-open {
   background: var(--ed-panel2);
   box-shadow: var(--ed-shadow);
   color: var(--ed-text);
-  font-size: 14px;
+  font-size: calc(14px * var(--fs));
   outline: none;
 }
 .kbe-modal-h {
   margin: 0 0 10px;
   color: var(--ed-fg);
   font-family: var(--ed-ui);
-  font-size: 17px;
+  font-size: calc(17px * var(--fs));
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -659,7 +699,7 @@ html.kbe-open {
   display: block;
   margin: 12px 0 6px;
   color: var(--ed-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--fs));
   &:first-child {
     margin-top: 0;
   }
@@ -673,7 +713,7 @@ html.kbe-open {
   background: var(--ed-bg);
   box-shadow: inset 0 0 0 1px var(--ed-line2);
   color: var(--ed-fg);
-  font: 14px var(--ed-ui);
+  font: calc(14px * var(--fs)) var(--ed-ui);
   outline: none;
   &:focus {
     box-shadow: inset 0 0 0 1px var(--ed-fg);
@@ -686,7 +726,7 @@ select.kbe-input {
   min-height: 18px;
   margin: 8px 0 0;
   color: var(--ed-danger);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--fs));
 }
 .kbe-menu {
   position: fixed;
@@ -715,7 +755,7 @@ select.kbe-input {
   border-radius: var(--ed-r);
   background: none;
   color: var(--ed-text);
-  font: 14px var(--ed-ui);
+  font: calc(14px * var(--fs)) var(--ed-ui);
   text-align: left;
   cursor: pointer;
   .ic {
@@ -787,7 +827,7 @@ select.kbe-input {
   background: var(--ed-panel2);
   box-shadow: var(--ed-shadow);
   color: var(--ed-fg);
-  font-size: 13px;
+  font-size: calc(13px * var(--fs));
   pointer-events: auto;
   animation: kbe-in 0.2s ease-out;
   transition:
@@ -858,6 +898,9 @@ select.kbe-input {
   .kbe.no-preview .kbe-body {
     grid-template-columns: 1fr;
   }
+  .kbe-gutter {
+    display: none;
+  }
   .kbe-preview {
     display: none;
     padding: 16px 16px 30vh;
@@ -892,7 +935,7 @@ select.kbe-input {
     display: none;
   }
   .kbe-save span {
-    font-size: 13px;
+    font-size: calc(13px * var(--fs));
   }
   .kbe-hint {
     display: none;

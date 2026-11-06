@@ -87,15 +87,6 @@ function renderTimes(root: Pick<ParentNode, "querySelectorAll"> = document) {
     el.textContent = (el.dataset.prefix ?? "") + ago(ts, short)
   })
 }
-function todayIso(): string {
-  const d = new Date()
-  const p = (n: number) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
-function daysBetween(a: string, b: string): number {
-  return Math.round((Date.parse(b) - Date.parse(a)) / 86400000)
-}
-
 /* ───────────── тема ───────────── */
 function setTheme(t: "light" | "dark") {
   html.setAttribute("saved-theme", t)
@@ -107,25 +98,128 @@ function setTheme(t: "light" | "dark") {
     .forEach((m) => m.setAttribute("content", t === "dark" ? "#08090a" : "#ffffff"))
   document.dispatchEvent(new CustomEvent("themechange", { detail: { theme: t } }))
 }
-/* ───────────── оформление: Linear / «Консоль» ───────────── */
-function currentSkin(): "linear" | "console" {
-  return html.getAttribute("data-skin") === "console" ? "console" : "linear"
+/* ───────────── настройки вида ───────────── */
+type ViewOpt = "skin" | "theme" | "width" | "fs" | "panel"
+const VIEW_DEFAULT: Record<ViewOpt, string> = {
+  skin: "linear",
+  theme: "dark",
+  width: "normal",
+  fs: "m",
+  panel: "on",
 }
-function markSkin() {
-  const skin = currentSkin()
+const VIEW_ALLOWED: Record<ViewOpt, string[]> = {
+  skin: ["linear", "console"],
+  theme: ["dark", "light"],
+  width: ["narrow", "normal", "wide", "full"],
+  fs: ["s", "m", "l", "xl"],
+  panel: ["on", "off"],
+}
+const VIEW_ATTR: Record<ViewOpt, string> = {
+  skin: "data-skin",
+  theme: "saved-theme",
+  width: "data-width",
+  fs: "data-fs",
+  panel: "data-panel",
+}
+const VIEW_KEY: Record<ViewOpt, string> = {
+  skin: "skin",
+  theme: "theme",
+  width: "kb-width",
+  fs: "kb-fs",
+  panel: "kb-panel",
+}
+function viewGet(o: ViewOpt): string {
+  const v = html.getAttribute(VIEW_ATTR[o])
+  return v && VIEW_ALLOWED[o].includes(v) ? v : VIEW_DEFAULT[o]
+}
+function markSettings() {
+  document.querySelectorAll<HTMLElement>("[data-opt]").forEach((g) => {
+    const cur = viewGet(g.dataset.opt as ViewOpt)
+    g.querySelectorAll<HTMLElement>("button[data-v]").forEach((b) => {
+      const on = b.dataset.v === cur
+      b.classList.toggle("on", on)
+      b.setAttribute("aria-checked", String(on))
+    })
+  })
+  const panelOn = viewGet("panel") === "on"
   document
-    .querySelectorAll<HTMLElement>("[data-skin-set]")
-    .forEach((b) => b.classList.toggle("on", b.dataset.skinSet === skin))
+    .querySelectorAll<HTMLElement>("[data-panel-toggle]")
+    .forEach((b) => b.classList.toggle("on", panelOn))
 }
-function setSkin(skin: "linear" | "console") {
-  html.setAttribute("data-skin", skin)
+function setView(o: ViewOpt, v: string) {
+  if (!VIEW_ALLOWED[o].includes(v)) return
+  if (o === "theme") {
+    if (viewGet("theme") !== v) toggleTheme()
+    return
+  }
+  // значения по умолчанию не пишем в атрибут: так CSS проще
+  if (v === VIEW_DEFAULT[o] && o !== "skin") html.removeAttribute(VIEW_ATTR[o])
+  else html.setAttribute(VIEW_ATTR[o], v)
   try {
-    localStorage.setItem("skin", skin)
+    localStorage.setItem(VIEW_KEY[o], v)
   } catch {}
-  markSkin()
-  // граф перечитывает цвета на событие смены темы
-  const t = html.getAttribute("saved-theme") === "light" ? "light" : "dark"
-  document.dispatchEvent(new CustomEvent("themechange", { detail: { theme: t } }))
+  markSettings()
+  if (o === "skin") {
+    const t = viewGet("theme")
+    document.dispatchEvent(new CustomEvent("themechange", { detail: { theme: t } }))
+  }
+}
+function openSettings() {
+  html.classList.remove("drawer-open")
+  closePalette()
+  markSettings()
+  html.classList.add("settings-open")
+  document.querySelector<HTMLElement>("[data-settings-dialog] .set-seg button.on")?.focus()
+}
+function closeSettings() {
+  html.classList.remove("settings-open")
+}
+
+/* ───────────── короткие уведомления ───────────── */
+function flash(text: string) {
+  let box = document.querySelector<HTMLElement>(".flash")
+  if (!box) {
+    box = document.createElement("div")
+    box.className = "flash"
+    box.setAttribute("role", "status")
+    document.body.appendChild(box)
+  }
+  box.textContent = text
+  box.classList.remove("show")
+  void box.offsetWidth
+  box.classList.add("show")
+  clearTimeout(Number(box.dataset.t))
+  box.dataset.t = String(setTimeout(() => box!.classList.remove("show"), 2200))
+}
+
+/* ───────────── поделиться ───────────── */
+async function shareCurrent() {
+  const url = location.href.replace(/#.*$/, "")
+  const title =
+    document.querySelector<HTMLElement>(".n-title")?.textContent?.trim() || document.title
+  const coarse = matchMedia("(pointer: coarse)").matches
+  if (coarse && navigator.share) {
+    try {
+      await navigator.share({ title, url })
+      return
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url)
+    flash("Ссылка скопирована")
+  } catch {
+    // запасной путь для http и старых браузеров
+    const ta = document.createElement("textarea")
+    ta.value = url
+    ta.style.cssText = "position:fixed;opacity:0"
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand("copy")
+    ta.remove()
+    flash(ok ? "Ссылка скопирована" : url)
+  }
 }
 
 function toggleTheme() {
@@ -476,54 +570,6 @@ function applyHomeModes() {
   }
 }
 
-function reviewBadge() {
-  const b = document.querySelector<HTMLElement>("[data-review-badge]")
-  const v = store.get<{ day: string; n: number } | null>("kb-review-due", null)
-  if (b) b.textContent = v && v.day === todayIso() && v.n > 0 ? String(v.n) : ""
-}
-
-function setupReview() {
-  const box = document.querySelector<HTMLElement>("[data-review]")
-  if (!box) return
-  const today = todayIso()
-  const done = new Set(store.get<string[]>("kb-review-done", []))
-  let due = 0
-  let next: { d: string; t: string } | null = null
-  box.querySelectorAll<HTMLElement>("li[data-due]").forEach((li) => {
-    const d = li.dataset.due!
-    const key = `${li.dataset.slug}@${d}`
-    const diff = daysBetween(d, today)
-    const label = li.querySelector<HTMLElement>(".td-d")!
-    const input = li.querySelector<HTMLInputElement>("input")!
-    input.checked = done.has(key)
-    if (diff < 0) {
-      li.hidden = true
-      if (!next) next = { d, t: li.querySelector(".row-t")?.textContent ?? "" }
-      return
-    }
-    li.hidden = false
-    label.textContent = diff === 0 ? "сегодня" : `просрочено на ${diff} дн.`
-    label.classList.toggle("late", diff > 0)
-    if (!input.checked) due++
-  })
-  const count = document.querySelector<HTMLElement>("[data-review-count]")
-  if (count) count.textContent = String(due)
-  store.set("kb-review-due", { day: today, n: due })
-  const visible = box.querySelectorAll("li:not([hidden])").length
-  box.hidden = visible === 0
-  const empty = document.querySelector<HTMLElement>("[data-review-empty]")
-  if (empty) {
-    empty.hidden = visible > 0
-    const n = empty.querySelector<HTMLElement>("[data-review-next]")
-    if (n) {
-      const nx = next as { d: string; t: string } | null
-      n.textContent = nx
-        ? `Следующее: ${nx.t}, ${nx.d}.`
-        : "Добавь review: ГГГГ-ММ-ДД во frontmatter заметки."
-    }
-  }
-}
-
 /* ───────────── редактирование на сайте ───────────── */
 type Me = { login: string; name: string; avatar: string | null }
 type EditorModule = {
@@ -532,6 +578,7 @@ type EditorModule = {
   newNote: (folder?: string) => Promise<void>
   onNav: () => void
   isDirty: () => boolean
+  isOpen: () => boolean
   toast: (html: string, o?: { kind?: string; timeout?: number }) => unknown
 }
 let editorModule: EditorModule | null = null
@@ -648,13 +695,28 @@ function bindGlobal() {
       toggleTheme()
       return
     }
-    const skinSet = t.closest<HTMLElement>("[data-skin-set]")
-    if (skinSet) {
-      setSkin(skinSet.dataset.skinSet === "console" ? "console" : "linear")
+    const optBtn = t.closest<HTMLElement>("[data-opt] button[data-v]")
+    if (optBtn) {
+      const o = optBtn.closest<HTMLElement>("[data-opt]")!.dataset.opt as ViewOpt
+      setView(o, optBtn.dataset.v!)
       return
     }
-    if (t.closest("[data-skin-toggle]")) {
-      setSkin(currentSkin() === "console" ? "linear" : "console")
+    if (t.closest("[data-settings-close]")) {
+      closeSettings()
+      return
+    }
+    if (t.closest("[data-settings]")) {
+      ev.preventDefault()
+      html.classList.contains("settings-open") ? closeSettings() : openSettings()
+      return
+    }
+    if (t.closest("[data-share]")) {
+      ev.preventDefault()
+      shareCurrent()
+      return
+    }
+    if (t.closest("[data-panel-toggle]")) {
+      setView("panel", viewGet("panel") === "on" ? "off" : "on")
       return
     }
     if (t.closest("[data-edit]")) {
@@ -696,12 +758,6 @@ function bindGlobal() {
     }
     if (t.closest("[data-palette-backdrop]")) {
       closePalette()
-      return
-    }
-    if (t.closest("[data-global-graph]")) {
-      ev.preventDefault()
-      html.classList.remove("drawer-open")
-      document.querySelector<HTMLElement>(".global-graph-icon")?.click()
       return
     }
     if (t.closest("[data-drawer]")) {
@@ -747,19 +803,6 @@ function bindGlobal() {
     }
   })
 
-  document.addEventListener("change", (ev) => {
-    const input = ev.target as HTMLInputElement
-    const li = input.closest<HTMLElement>("[data-review] li")
-    if (!li) return
-    const key = `${li.dataset.slug}@${li.dataset.due}`
-    const done = new Set(store.get<string[]>("kb-review-done", []))
-    if (input.checked) done.add(key)
-    else done.delete(key)
-    store.set("kb-review-done", [...done].slice(-300))
-    setupReview()
-    reviewBadge()
-  })
-
   document.addEventListener("input", (ev) => {
     const t = ev.target as HTMLInputElement
     if (t.matches("[data-palette-input]")) runSearch(t.value)
@@ -788,8 +831,22 @@ function bindGlobal() {
       }
       return
     }
-    if (ev.key === "Escape") html.classList.remove("drawer-open")
+    if (ev.key === "Escape") {
+      html.classList.remove("drawer-open")
+      closeSettings()
+    }
     if (typing || ev.ctrlKey || ev.metaKey || ev.altKey) return
+    if (editorModule?.isOpen()) return
+    if (ev.key === ",") {
+      ev.preventDefault()
+      html.classList.contains("settings-open") ? closeSettings() : openSettings()
+      return
+    }
+    if (ev.code === "BracketRight" && currentNotePath()) {
+      ev.preventDefault()
+      setView("panel", viewGet("panel") === "on" ? "off" : "on")
+      return
+    }
     if (ev.key === "/") {
       ev.preventDefault()
       openPalette()
@@ -843,11 +900,10 @@ function onNav() {
   restoreExplorer()
   enhanceCode()
   recordOpened()
-  setupReview()
-  reviewBadge()
   setupHome()
 
-  markSkin()
+  closeSettings()
+  markSettings()
   const bars = document.querySelectorAll<HTMLElement>("[data-progress]")
   const tocUpdate = setupToc()
   let raf = 0
@@ -872,6 +928,7 @@ function onNav() {
 }
 
 bindGlobal()
+document.addEventListener("themechange", () => markSettings())
 document.addEventListener("nav", onNav)
 if (new URLSearchParams(location.search).has("search")) setTimeout(openPalette, 300)
 document.addEventListener("render", () => enhanceCode())

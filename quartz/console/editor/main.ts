@@ -263,6 +263,53 @@ function trackDeploy(commit: string, what: string, opts: { open?: string; home?:
 type Draft = { content: string; base: string | null; ts: number }
 const draftKey = (path: string) => `kb-draft:${path}`
 
+/* ── граница между текстом и превью: тянется мышью, стрелками, сбрасывается двойным щелчком ── */
+const SPLIT_KEY = "kb-editor-split"
+function setupSplit(body: HTMLElement, gutter: HTMLElement) {
+  const apply = (f: number) => {
+    const v = Math.min(0.8, Math.max(0.2, f))
+    body.style.setProperty("--split", `${(v * 100).toFixed(2)}%`)
+    gutter.setAttribute("aria-valuenow", String(Math.round(v * 100)))
+    return v
+  }
+  let cur = apply(store.get<number>(SPLIT_KEY) || 0.5)
+  const save = () => store.set(SPLIT_KEY, cur)
+  gutter.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    gutter.setPointerCapture(e.pointerId)
+    body.classList.add("resizing")
+    const rect = body.getBoundingClientRect()
+    const move = (ev: PointerEvent) => {
+      cur = apply((ev.clientX - rect.left) / rect.width)
+    }
+    const up = () => {
+      gutter.removeEventListener("pointermove", move)
+      gutter.removeEventListener("pointerup", up)
+      gutter.removeEventListener("pointercancel", up)
+      body.classList.remove("resizing")
+      save()
+    }
+    gutter.addEventListener("pointermove", move)
+    gutter.addEventListener("pointerup", up)
+    gutter.addEventListener("pointercancel", up)
+  })
+  gutter.addEventListener("dblclick", () => {
+    cur = apply(0.5)
+    save()
+  })
+  gutter.addEventListener("keydown", (e) => {
+    const step = e.shiftKey ? 0.1 : 0.02
+    if (e.key === "ArrowLeft") cur = apply(cur - step)
+    else if (e.key === "ArrowRight") cur = apply(cur + step)
+    else if (e.key === "Home") cur = apply(0.2)
+    else if (e.key === "End") cur = apply(0.8)
+    else return
+    e.preventDefault()
+    save()
+  })
+}
+
 class Session {
   path: string
   sha: string | null
@@ -383,13 +430,17 @@ class Session {
     const editorPane = el("div", { class: "kbe-pane kbe-edit" })
     this.previewEl = el("div", { class: "kbe-pane kbe-preview prose" })
     this.footEl = el("footer", { class: "kbe-foot" })
-    this.root.append(
-      head,
-      toolbar,
-      this.banner,
-      el("div", { class: "kbe-body" }, editorPane, this.previewEl),
-      this.footEl,
-    )
+    const gutter = el("div", {
+      class: "kbe-gutter",
+      role: "separator",
+      tabindex: "0",
+      "aria-orientation": "vertical",
+      "aria-label": "Граница между текстом и превью",
+      title: "Потяните, чтобы изменить ширину. Двойной щелчок — поровну",
+    })
+    const body = el("div", { class: "kbe-body" }, editorPane, gutter, this.previewEl)
+    this.root.append(head, toolbar, this.banner, body, this.footEl)
+    setupSplit(body, gutter)
     if (store.get<boolean>("kb-editor-nopreview")) this.root.classList.add("no-preview")
 
     document.addEventListener("keydown", this.onKey, true)

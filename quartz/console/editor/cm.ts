@@ -79,7 +79,7 @@ const highlight = HighlightStyle.define([
 const theme = EditorView.theme({
   "&": {
     height: "100%",
-    fontSize: "15px",
+    fontSize: "calc(15px * var(--fs, 1))",
     backgroundColor: "transparent",
     color: "var(--ed-text)",
   },
@@ -107,7 +107,7 @@ const theme = EditorView.theme({
   },
   ".cm-tooltip-autocomplete > ul": {
     fontFamily: "var(--ed-ui)",
-    fontSize: "13px",
+    fontSize: "calc(13px * var(--fs, 1))",
     maxHeight: "260px",
   },
   ".cm-tooltip-autocomplete > ul > li": { padding: "6px 10px !important", color: "var(--ed-text)" },

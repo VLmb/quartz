@@ -16,13 +16,13 @@ import {
   NoteMeta,
   Palette,
   Properties,
+  Settings,
   Sidebar,
   Toc,
 } from "./components"
 import { notes, pageKind, pathSegments, title } from "./data"
 import { QuartzPluginData } from "../plugins/vfile"
 import { editorBundle } from "./editorBundle"
-import { Icon } from "./icons"
 
 /** Настоящий путь папки (с пробелами и регистром) по её slug. */
 function realFolder(allFiles: QuartzPluginData[], slug: string): string {
@@ -38,7 +38,7 @@ function realFolder(allFiles: QuartzPluginData[], slug: string): string {
  *
  * Linear: боковая панель (навигация и дерево заметок),
  * верхняя полоса с путём, контент и правая панель (свойства, содержание,
- * связи, история). На телефоне — нижние вкладки и выезжающая панель.
+ * история). На телефоне — нижние вкладки и выезжающая панель.
  */
 export const ConsoleFrame: PageFrame = {
   name: "console",
@@ -48,7 +48,6 @@ export const ConsoleFrame: PageFrame = {
     beforeBody,
     pageBody: Content,
     afterBody,
-    right,
     footer,
   }: PageFrameProps) {
     const p = componentData
@@ -117,25 +116,9 @@ export const ConsoleFrame: PageFrame = {
                 <Toc {...p} />
               </section>
             )}
-            <section class="pane">
-              <div class="pane-h">
-                <span>Связи</span>
-                <button
-                  type="button"
-                  class="icon-btn sm"
-                  data-global-graph
-                  title="Весь граф (Ctrl G)"
-                >
-                  <Icon name="graph" />
-                </button>
-              </div>
-              <div class="p-graph">{render(right)}</div>
-            </section>
             <History {...p} />
           </aside>
-        ) : (
-          <div class="p-graph p-hidden">{render(right)}</div>
-        )}
+        ) : null}
         <CStatusbar {...p} />
         {render(footer)}
         <MobileTabs {...p} />
@@ -143,6 +126,7 @@ export const ConsoleFrame: PageFrame = {
         <span hidden data-editor-url={editorBundle.file}></span>
         <div class="drawer-backdrop" data-drawer-backdrop></div>
         <Palette />
+        <Settings />
       </div>
     )
   },
