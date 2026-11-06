@@ -957,6 +957,7 @@ export function Settings() {
           opt="skin"
           items={[
             { v: "linear", label: "Linear" },
+            { v: "github", label: "GitHub" },
             { v: "console", label: "Консоль" },
           ]}
         />

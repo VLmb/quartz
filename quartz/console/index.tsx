@@ -11,7 +11,7 @@ export { EditorBundle, buildEditorBundle } from "./editorBundle"
 // Тема, оформление и настройки вида выставляются до отрисовки страницы, чтобы не было вспышки.
 const themeScript = `(function(){var d=document.documentElement;function g(k){try{return localStorage.getItem(k)}catch(e){return null}}
 var t=g("theme");if(t!=="light"&&t!=="dark")t="dark";
-var s=g("skin");if(s!=="console")s="linear";
+var s=g("skin");if(s!=="console"&&s!=="github")s="linear";
 d.setAttribute("saved-theme",t);d.setAttribute("data-skin",s);
 var w=g("kb-width");if(/^(narrow|wide|full)$/.test(w||""))d.setAttribute("data-width",w);
 var f=g("kb-fs");if(/^(s|l|xl)$/.test(f||""))d.setAttribute("data-fs",f);

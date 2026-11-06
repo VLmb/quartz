@@ -88,14 +88,20 @@ function renderTimes(root: Pick<ParentNode, "querySelectorAll"> = document) {
   })
 }
 /* ───────────── тема ───────────── */
+/** Цвет строки состояния браузера = фон текущего оформления. */
+function syncThemeColor() {
+  const bg = getComputedStyle(html).getPropertyValue("--bg").trim()
+  if (bg)
+    document
+      .querySelectorAll('meta[name="theme-color"]')
+      .forEach((m) => m.setAttribute("content", bg))
+}
 function setTheme(t: "light" | "dark") {
   html.setAttribute("saved-theme", t)
   try {
     localStorage.setItem("theme", t)
   } catch {}
-  document
-    .querySelectorAll('meta[name="theme-color"]')
-    .forEach((m) => m.setAttribute("content", t === "dark" ? "#08090a" : "#ffffff"))
+  syncThemeColor()
   document.dispatchEvent(new CustomEvent("themechange", { detail: { theme: t } }))
 }
 /* ───────────── настройки вида ───────────── */
@@ -108,7 +114,7 @@ const VIEW_DEFAULT: Record<ViewOpt, string> = {
   panel: "on",
 }
 const VIEW_ALLOWED: Record<ViewOpt, string[]> = {
-  skin: ["linear", "console"],
+  skin: ["linear", "github", "console"],
   theme: ["dark", "light"],
   width: ["narrow", "normal", "wide", "full"],
   fs: ["s", "m", "l", "xl"],
@@ -160,6 +166,7 @@ function setView(o: ViewOpt, v: string) {
   } catch {}
   markSettings()
   if (o === "skin") {
+    syncThemeColor()
     const t = viewGet("theme")
     document.dispatchEvent(new CustomEvent("themechange", { detail: { theme: t } }))
   }
@@ -904,6 +911,7 @@ function onNav() {
 
   closeSettings()
   markSettings()
+  syncThemeColor()
   const bars = document.querySelectorAll<HTMLElement>("[data-progress]")
   const tocUpdate = setupToc()
   let raf = 0

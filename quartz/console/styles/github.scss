@@ -1,0 +1,113 @@
+// Оформление «GitHub»: раскладка Linear (все правила linear.scss действуют, раз это не «Консоль»),
+// но палитра, шрифты и скругления — в духе интерфейса GitHub (Primer).
+
+html[data-skin="github"] {
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --r-sm: 6px;
+  --r: 6px;
+  --r-card: 6px;
+  --gh-link: #4493f8;
+  --pulse-green: #3fb950;
+  --coral-red: #f85149;
+  --amber: #d29922;
+}
+html[data-skin="github"],
+html[data-skin="github"][saved-theme="dark"] {
+  --bg: #0d1117;
+  --bg2: #151b23;
+  --bg3: #212830;
+  --tint: #262c36;
+  --line: #3d444d;
+  --line2: #3d444d;
+  --fg: #f0f6fc;
+  --text: #f0f6fc;
+  --muted: #9198a1;
+  --faint: #656c76;
+  --accent: #238636;
+  --accent-fg: #ffffff;
+  --indicator: #f78166;
+  --hover: rgba(101, 108, 118, 0.15);
+  --active: rgba(101, 108, 118, 0.25);
+  --pill: rgba(56, 139, 253, 0.1);
+  --field: #0d1117;
+  --field-line: #3d444d;
+  --mark: rgba(187, 128, 9, 0.4);
+  --code-bg: #151b23;
+  --tk-k: #ff7b72;
+  --tk-c: #9198a1;
+  --tk-f: #d2a8ff;
+  --tk-s: #a5d6ff;
+  --tk-n: #79c0ff;
+  --tk-t: #ffa657;
+  --shadow-pop: 0 0 0 1px #3d444d, 0 8px 24px rgba(1, 4, 9, 0.75);
+  --shadow-xl: 0 8px 24px rgba(1, 4, 9, 0.75);
+  --backdrop: rgba(1, 4, 9, 0.6);
+}
+html[data-skin="github"][saved-theme="light"] {
+  --gh-link: #0969da;
+  --pulse-green: #1a7f37;
+  --coral-red: #d1242f;
+  --amber: #9a6700;
+  --bg: #ffffff;
+  --bg2: #f6f8fa;
+  --bg3: #eff2f5;
+  --tint: #eff2f5;
+  --line: #d1d9e0;
+  --line2: #d1d9e0;
+  --fg: #1f2328;
+  --text: #1f2328;
+  --muted: #59636e;
+  --faint: #818b98;
+  --accent: #1f883d;
+  --accent-fg: #ffffff;
+  --indicator: #fd8c73;
+  --hover: rgba(208, 215, 222, 0.32);
+  --active: rgba(208, 215, 222, 0.48);
+  --pill: #ddf4ff;
+  --field: #ffffff;
+  --field-line: #d1d9e0;
+  --mark: #fff8c5;
+  --code-bg: #f6f8fa;
+  --tk-k: #cf222e;
+  --tk-c: #59636e;
+  --tk-f: #8250df;
+  --tk-s: #0a3069;
+  --tk-n: #0550ae;
+  --tk-t: #953800;
+  --shadow-pop: 0 0 0 1px #d1d9e0, 0 8px 24px rgba(140, 149, 159, 0.2);
+  --shadow-xl: 0 8px 24px rgba(140, 149, 159, 0.2);
+  --backdrop: rgba(31, 35, 40, 0.4);
+}
+
+html[data-skin="github"] {
+  body {
+    font-feature-settings: normal;
+  }
+  // ссылки — синие, как на GitHub
+  .prose a.internal:not(.tag-link):not([role="anchor"]),
+  .prose a.external {
+    color: var(--gh-link);
+    text-decoration: none;
+    &:hover {
+      text-decoration: underline;
+      text-decoration-color: currentColor;
+    }
+  }
+  .prose a.internal.broken {
+    color: var(--muted);
+  }
+  // теги — «топики» GitHub: синие пилюли
+  .pill,
+  .tag-link {
+    color: var(--gh-link);
+    background: var(--pill);
+  }
+  // код без подложки-карточки, как в README
+  .prose :not(pre) > code {
+    background: rgba(101, 108, 118, 0.2);
+  }
+}
