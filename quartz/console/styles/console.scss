@@ -320,3 +320,19 @@ html[data-skin="console"] {
     color: var(--h2);
   }
 }
+
+/* ───────────── логотип ───────────── */
+:root:root .logo {
+  padding: 0;
+  overflow: hidden;
+  background: #000207;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    margin: 0;
+    max-height: none;
+  }
+}

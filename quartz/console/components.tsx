@@ -1,6 +1,7 @@
 import { QuartzComponentProps } from "../components/types"
 import { QuartzPluginData } from "../plugins/vfile"
 import { Icon } from "./icons"
+import { FullSlug, pathToRoot } from "../util/path"
 import {
   backlinksOf,
   desc,
@@ -65,6 +66,13 @@ function Tags({ f, from }: { f: QuartzPluginData; from?: string }) {
   )
 }
 
+/* ───────────── логотип ───────────── */
+
+export function Logo({ from }: { from: string | undefined }) {
+  const root = pathToRoot((from ?? "index") as FullSlug)
+  return <img src={`${root}/static/logo.png`} alt="" width={22} height={22} decoding="async" />
+}
+
 /* ───────────── верхняя панель (над контентом) ───────────── */
 
 export function Topbar(props: P) {
@@ -118,8 +126,8 @@ export function Topbar(props: P) {
           </>
         )}
         <a class="m-only tb-home" href={href(fileData.slug, "index")} aria-label={cfg.pageTitle}>
-          <span class="mark">
-            <Icon name="terminal" />
+          <span class="mark logo">
+            <Logo from={fileData.slug} />
           </span>
         </a>
       </div>
@@ -277,8 +285,8 @@ export function Sidebar({ fileData, allFiles, cfg }: P) {
     <aside class="side" data-explorer>
       <div class="sb-top">
         <a class="ws" href={href(current, "index")}>
-          <span class="mark">
-            <Icon name="terminal" />
+          <span class="mark logo">
+            <Logo from={fileData.slug} />
           </span>
           <b>{cfg.pageTitle}</b>
         </a>
@@ -592,8 +600,8 @@ export function CTitlebar({ fileData, allFiles, cfg }: P) {
   return (
     <>
       <a class="tb-logo" href={href(fileData.slug, "index")}>
-        <span class="tb-mark">
-          <Icon name="terminal" />
+        <span class="tb-mark logo">
+          <Logo from={fileData.slug} />
         </span>
         <b>{cfg.pageTitle}</b>
         <span class="tb-path">~/knowledge</span>
