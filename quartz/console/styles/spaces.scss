@@ -1328,3 +1328,13 @@ $rc: 8px;
 :root:root .sp-capture-wrap * {
   box-sizing: border-box;
 }
+
+/* сообщения («Загружаю…», ошибки) — с теми же отступами, что и доска */
+:root:root .sp-tasks > .sp-empty {
+  padding: 4px 32px 24px;
+}
+@media (max-width: 800px) {
+  :root:root .sp-tasks > .sp-empty {
+    padding: 4px 16px 20px;
+  }
+}
