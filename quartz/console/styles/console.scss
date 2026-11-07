@@ -336,3 +336,46 @@ html[data-skin="console"] {
     max-height: none;
   }
 }
+
+/* ───────────── Google Tasks в настройках ───────────── */
+html:not(.kb-gtasks) .gt-row {
+  display: none !important;
+}
+:root:root {
+  .gt-status {
+    margin: 0;
+    color: var(--ed-text);
+    font-size: calc(13px * var(--fs));
+    line-height: 1.45;
+  }
+  .gt-row.err .gt-status {
+    color: var(--ed-danger);
+  }
+  .gt-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .gt-btn {
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--ed-line2);
+    border-radius: var(--ed-r);
+    background: var(--ed-accent);
+    color: var(--ed-accent-fg);
+    font: 500 calc(13px * var(--fs)) var(--ed-ui);
+    cursor: pointer;
+    &.ghost,
+    &[data-gt-sync] {
+      background: transparent;
+      color: var(--ed-fg);
+    }
+    &:hover {
+      filter: brightness(1.08);
+    }
+  }
+  .gt-row[data-state="on"] .gt-off-only,
+  .gt-row:not([data-state="on"]) .gt-on-only {
+    display: none;
+  }
+}

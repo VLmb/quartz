@@ -7,6 +7,10 @@ import { deriveKey } from "./crypto.mjs"
 import { GitHub } from "./github.mjs"
 import { SessionStore } from "./sessions.mjs"
 import { createApp } from "./app.mjs"
+import { SecretStore } from "./store.mjs"
+import { TokenKeeper } from "./tokens.mjs"
+import { Google } from "./google.mjs"
+import { TaskSync } from "./tasksync.mjs"
 
 const cfg = loadConfig()
 const sessions = new SessionStore({
@@ -20,7 +24,39 @@ const log = {
   warn: (m) => console.warn(m),
   error: (m) => console.error(m),
 }
-const server = http.createServer(createApp(cfg, { github, sessions, log }))
+const tokens = new TokenKeeper({
+  store: new SecretStore(
+    path.join(cfg.dataDir, "tokens.enc"),
+    deriveKey(cfg.sessionSecret, "tokens"),
+  ),
+  github,
+  log,
+})
+const google = new Google(cfg)
+const tasks = google.enabled
+  ? new TaskSync({
+      cfg,
+      github,
+      google,
+      tokens,
+      store: new SecretStore(
+        path.join(cfg.dataDir, "gtasks.enc"),
+        deriveKey(cfg.sessionSecret, "gtasks"),
+      ),
+      log,
+    })
+  : null
+const server = http.createServer(createApp(cfg, { github, sessions, tokens, google, tasks, log }))
+
+// фоновая синхронизация задач
+if (tasks) {
+  const tick = () => {
+    if (tasks.connected) tasks.run("timer").catch(() => {})
+  }
+  setTimeout(tick, 15_000).unref()
+  setInterval(tick, cfg.gtasksIntervalMin * 60_000).unref()
+  log.info(`Google Tasks: синхронизация каждые ${cfg.gtasksIntervalMin} мин`)
+}
 server.requestTimeout = 120_000
 server.headersTimeout = 30_000
 

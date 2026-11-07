@@ -203,6 +203,62 @@ export class GitHub {
     return { sha: file.sha, commit: next.sha }
   }
 
+  /* ───── снимок репозитория и пакетный коммит (для синхронизации задач) ───── */
+
+  async headSha(token) {
+    const b = encodeURIComponent(this.cfg.branch)
+    const ref = await this.request(token, "GET", `${this.repoPath}/git/ref/heads/${b}`)
+    return ref.object.sha
+  }
+
+  async treeAt(token, sha) {
+    const data = await this.request(
+      token,
+      "GET",
+      `${this.repoPath}/git/trees/${encodeURIComponent(sha)}?recursive=1`,
+    )
+    return data.tree ?? []
+  }
+
+  async blob(token, sha) {
+    const data = await this.request(
+      token,
+      "GET",
+      `${this.repoPath}/git/blobs/${encodeURIComponent(sha)}`,
+    )
+    return Buffer.from(data.content ?? "", data.encoding === "base64" ? "base64" : "utf8").toString(
+      "utf8",
+    )
+  }
+
+  /**
+   * Один коммит с несколькими файлами поверх head. Если ветка ушла вперёд —
+   * GitHub ответит 422, и вызывающий повторит попытку с нового снимка.
+   * changes: [{ path, content }] (content === null — удалить файл).
+   */
+  async commitChanges(token, head, changes, message) {
+    const b = encodeURIComponent(this.cfg.branch)
+    const commit = await this.request(token, "GET", `${this.repoPath}/git/commits/${head}`)
+    const tree = await this.request(token, "POST", `${this.repoPath}/git/trees`, {
+      base_tree: commit.tree.sha,
+      tree: changes.map((c) =>
+        c.content === null
+          ? { path: c.path, mode: "100644", type: "blob", sha: null }
+          : { path: c.path, mode: "100644", type: "blob", content: c.content },
+      ),
+    })
+    const next = await this.request(token, "POST", `${this.repoPath}/git/commits`, {
+      message,
+      tree: tree.sha,
+      parents: [head],
+    })
+    await this.request(token, "PATCH", `${this.repoPath}/git/refs/heads/${b}`, {
+      sha: next.sha,
+      force: false,
+    })
+    return next.sha
+  }
+
   async deployStatus(token, sha) {
     const data = await this.request(
       token,

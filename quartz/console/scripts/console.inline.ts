@@ -176,6 +176,7 @@ function openSettings() {
   closePalette()
   markSettings()
   html.classList.add("settings-open")
+  gtStatus()
   document.querySelector<HTMLElement>("[data-settings-dialog] .set-seg button.on")?.focus()
 }
 function closeSettings() {
@@ -578,7 +579,7 @@ function applyHomeModes() {
 }
 
 /* ───────────── редактирование на сайте ───────────── */
-type Me = { login: string; name: string; avatar: string | null }
+type Me = { login: string; name: string; avatar: string | null; gtasks?: boolean }
 type EditorModule = {
   init: (h: { root: string; entries: () => Promise<Entry[]> }) => void
   openEditor: (path: string) => Promise<void>
@@ -611,6 +612,7 @@ function loadEditor(): Promise<EditorModule> {
 
 function applyMe(me: Me | null) {
   html.classList.toggle("kb-auth", !!me)
+  html.classList.toggle("kb-gtasks", !!me?.gtasks)
   document
     .querySelectorAll<HTMLElement>("[data-account-login]")
     .forEach((e) => (e.textContent = me?.login ?? ""))
@@ -693,6 +695,85 @@ async function handleAuthReturn() {
   } catch {}
 }
 
+/* ───────────── Google Tasks ───────────── */
+function plural(n: number, one: string, few: string, many: string) {
+  const m10 = n % 10
+  const m100 = n % 100
+  if (m10 === 1 && m100 !== 11) return one
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few
+  return many
+}
+type GtStatus = {
+  connected: boolean
+  running: boolean
+  lastSync: number | null
+  lastError: string | null
+  lastStats: Record<string, number> | null
+  tasks: number
+  intervalMin: number
+}
+function gtRender(st: GtStatus | null, note?: string) {
+  const box = document.querySelector<HTMLElement>("[data-gtasks]")
+  if (!box) return
+  const text = box.querySelector<HTMLElement>("[data-gt-status]")!
+  box.dataset.state = !st ? "unknown" : st.connected ? "on" : "off"
+  if (note) text.textContent = note
+  else if (!st) text.textContent = "Не удалось узнать статус"
+  else if (!st.connected) text.textContent = "Не подключено"
+  else {
+    const when = st.lastSync
+      ? new Date(st.lastSync).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" })
+      : "ещё не было"
+    text.textContent = st.lastError
+      ? `Ошибка: ${st.lastError}`
+      : `Подключено · ${st.tasks} ${plural(st.tasks, "задача", "задачи", "задач")} · синхронизация ${when}, дальше каждые ${st.intervalMin} мин`
+  }
+  box.classList.toggle("err", !!st?.lastError)
+}
+async function gtStatus() {
+  if (!html.classList.contains("kb-gtasks")) return
+  try {
+    const r = await fetch(apiUrl("gtasks/status"), {
+      credentials: "same-origin",
+      cache: "no-store",
+    })
+    gtRender(r.ok ? ((await r.json()) as GtStatus) : null)
+  } catch {
+    gtRender(null)
+  }
+}
+async function gtPost(action: "sync" | "disconnect") {
+  gtRender(null, action === "sync" ? "Синхронизирую…" : "Отключаю…")
+  try {
+    const r = await fetch(apiUrl(`gtasks/${action}`), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "X-KB-Request": "1" },
+    })
+    const data = await r.json().catch(() => ({}))
+    if (action === "sync")
+      flash(r.ok ? "Задачи синхронизированы" : data.message || "Ошибка синхронизации")
+  } catch {
+    flash("Нет связи с сервером")
+  }
+  gtStatus()
+}
+function handleGtasksReturn() {
+  const params = new URLSearchParams(location.search)
+  const status = params.get("kb-gtasks")
+  if (!status) return
+  params.delete("kb-gtasks")
+  const q = params.toString()
+  history.replaceState(history.state, "", location.pathname + (q ? `?${q}` : "") + location.hash)
+  flash(
+    status === "ok"
+      ? "Google Tasks подключён — первая синхронизация уже идёт"
+      : status === "denied"
+        ? "Доступ к Google Tasks не выдан"
+        : "Не удалось подключить Google Tasks",
+  )
+}
+
 /* ───────────── обработчики (один раз) ───────────── */
 function bindGlobal() {
   document.addEventListener("click", (ev) => {
@@ -706,6 +787,19 @@ function bindGlobal() {
     if (optBtn) {
       const o = optBtn.closest<HTMLElement>("[data-opt]")!.dataset.opt as ViewOpt
       setView(o, optBtn.dataset.v!)
+      return
+    }
+    if (t.closest("[data-gt-connect]")) {
+      location.href = apiUrl("gtasks/connect").toString()
+      return
+    }
+    if (t.closest("[data-gt-sync]")) {
+      gtPost("sync")
+      return
+    }
+    if (t.closest("[data-gt-off]")) {
+      if (confirm("Отключить Google Tasks? Задачи в заметках и в Google останутся как есть."))
+        gtPost("disconnect")
       return
     }
     if (t.closest("[data-settings-close]")) {
@@ -892,6 +986,7 @@ function bindGlobal() {
     if (editorModule?.isDirty()) e.preventDefault()
   })
   handleAuthReturn()
+  handleGtasksReturn()
   checkAuth().then(() => {
     if (location.hash === "#edit" && html.classList.contains("kb-auth")) editCurrent()
   })

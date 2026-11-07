@@ -1,6 +1,8 @@
 import { BadRequest, checkFileContent, notePath, titleOf, uploadName } from "./paths.mjs"
 import { deriveKey, open, randomId, safeEqual, seal } from "./crypto.mjs"
 import { GitHubError } from "./github.mjs"
+import { SecretStore } from "./store.mjs"
+import { TokenError, TokenKeeper } from "./tokens.mjs"
 
 const JSON_LIMIT = 2 * 1024 * 1024
 const STATE_TTL = 10 * 60 * 1000
@@ -102,9 +104,15 @@ class RateLimiter {
   }
 }
 
-export function createApp(cfg, { github, sessions, now = () => Date.now(), log = console }) {
+export function createApp(
+  cfg,
+  { github, sessions, tokens, google = null, tasks = null, now = () => Date.now(), log = console },
+) {
+  tokens ??= new TokenKeeper({ store: new SecretStore(null, null), github, now, log })
   const cookieName = cfg.secureCookies ? "__Host-kb_session" : "kb_session"
   const stateCookie = cfg.secureCookies ? "__Host-kb_oauth" : "kb_oauth"
+  const gStateCookie = cfg.secureCookies ? "__Host-kb_goauth" : "kb_goauth"
+  const COOKIE_REFRESH_MS = 24 * 3600 * 1000
   const stateKey = deriveKey(cfg.sessionSecret, "oauth-state")
   const general = new RateLimiter(240, 60_000, now)
   const authLimit = new RateLimiter(30, 60_000, now)
@@ -131,26 +139,39 @@ export function createApp(cfg, { github, sessions, now = () => Date.now(), log =
     req.socket.remoteAddress ||
     "?"
 
-  /** Сессия + свежий токен GitHub (токены GitHub App живут 8 часов). */
-  async function requireSession(req) {
+  /** Сессия по cookie (без обращения к GitHub). */
+  function sessionOf(req) {
     const sid = parseCookies(req.headers.cookie)[cookieName]
     const s = sessions.get(sid)
-    if (!s) throw new HttpError(401, "Нужно войти")
-    if (s.tokenExp && s.tokenExp - 60_000 < now()) {
-      if (!s.refresh || (s.refreshExp && s.refreshExp < now())) {
-        sessions.delete(sid)
-        throw new HttpError(401, "Сессия истекла, войдите снова")
-      }
-      try {
-        const t = await github.refresh(s.refresh)
-        return { sid, session: sessions.touch(sid, t) }
-      } catch (e) {
-        log.warn?.(`refresh failed for ${s.login}: ${e.message}`)
-        sessions.delete(sid)
-        throw new HttpError(401, "Сессия истекла, войдите снова")
-      }
+    return s ? { sid, s } : null
+  }
+
+  function requireSession(req) {
+    const hit = sessionOf(req)
+    if (!hit) throw new HttpError(401, "Нужно войти")
+    const { sid, s } = hit
+    // старые сессии хранили токены GitHub в себе — переносим в общее хранилище
+    if (s.token) {
+      if (!tokens.has(s.login)) tokens.set(s.login, s)
+      sessions.touch(sid, {
+        token: undefined,
+        tokenExp: undefined,
+        refresh: undefined,
+        refreshExp: undefined,
+      })
     }
     return { sid, session: sessions.touch(sid) }
+  }
+
+  /** Сессия + действующий токен GitHub (токены GitHub App живут 8 часов). */
+  async function requireToken(req) {
+    const { sid, session } = requireSession(req)
+    try {
+      return { sid, session, token: await tokens.get(session.login) }
+    } catch (e) {
+      if (e instanceof TokenError) throw new HttpError(401, e.message, { error: "github" })
+      throw e
+    }
   }
 
   /** Обёртка над вызовами GitHub: 401 от GitHub — значит токен отозван. */
@@ -160,8 +181,9 @@ export function createApp(cfg, { github, sessions, now = () => Date.now(), log =
     } catch (e) {
       if (e instanceof GitHubError) {
         if (e.status === 401) {
-          sessions.delete(sid)
-          throw new HttpError(401, "GitHub отозвал доступ, войдите снова")
+          const s = sessions.get(sid)
+          if (s) tokens.drop(s.login)
+          throw new HttpError(401, "GitHub отозвал доступ, войдите снова", { error: "github" })
         }
         if (e.status === 403 || e.status === 404) {
           throw new HttpError(
@@ -173,6 +195,12 @@ export function createApp(cfg, { github, sessions, now = () => Date.now(), log =
         }
       }
       throw e
+    }
+  }
+
+  function needTasks() {
+    if (!google?.enabled || !tasks) {
+      throw new HttpError(501, "Google Tasks не настроен на сервере (GOOGLE_CLIENT_ID)")
     }
   }
 
@@ -221,11 +249,12 @@ export function createApp(cfg, { github, sessions, now = () => Date.now(), log =
         log.warn?.(`login denied for ${user.login}`)
         return back("denied")
       }
+      tokens.set(user.login, t)
       const sid = sessions.create({
         login: user.login,
         name: user.name ?? user.login,
         avatar: user.avatar_url ?? null,
-        ...t,
+        cookieAt: now(),
       })
       log.info?.(`login ${user.login}`)
       const u = new URL(next, cfg.siteOrigin)
@@ -244,27 +273,116 @@ export function createApp(cfg, { github, sessions, now = () => Date.now(), log =
       send(res, 200, { ok: true }, { "Set-Cookie": cookie(cookieName, "", 0) })
     },
 
-    "GET /api/me": async (req) => {
-      const { session } = await requireSession(req)
-      return {
-        login: session.login,
-        name: session.name,
-        avatar: session.avatar,
-        repo: cfg.repo,
-        branch: cfg.branch,
+    "GET /api/me": async (req, res) => {
+      const { sid, session } = requireSession(req)
+      const headers = {}
+      // cookie живёт SESSION_TTL_DAYS с последнего обновления: раз в сутки продлеваем
+      if (!session.cookieAt || now() - session.cookieAt > COOKIE_REFRESH_MS) {
+        sessions.touch(sid, { cookieAt: now() })
+        headers["Set-Cookie"] = cookie(cookieName, sid, cfg.sessionTtlMs / 1000)
+      }
+      send(
+        res,
+        200,
+        {
+          login: session.login,
+          name: session.name,
+          avatar: session.avatar,
+          repo: cfg.repo,
+          branch: cfg.branch,
+          github: tokens.has(session.login),
+          gtasks: Boolean(google?.enabled),
+        },
+        headers,
+      )
+    },
+
+    // Для nginx auth_request: весь сайт открыт только после входа. Без обращений к GitHub.
+    "GET /api/auth/check": async (req, res) => {
+      const hit = sessionOf(req)
+      if (hit) sessions.touch(hit.sid)
+      res.writeHead(hit ? 204 : 401, { "Cache-Control": "no-store" })
+      res.end()
+    },
+
+    /* ───── Google Tasks ───── */
+
+    "GET /api/gtasks/status": async (req) => {
+      requireSession(req)
+      needTasks()
+      return tasks.status()
+    },
+
+    "GET /api/gtasks/connect": async (req, res) => {
+      const { session } = requireSession(req)
+      needTasks()
+      const state = randomId(24)
+      const value = seal(stateKey, { state, login: session.login, ts: now() })
+      redirect(res, google.authorizeUrl(state), {
+        "Set-Cookie": cookie(gStateCookie, value, STATE_TTL / 1000),
+      })
+    },
+
+    "GET /api/gtasks/callback": async (req, res, url) => {
+      needTasks()
+      const cleared = cookie(gStateCookie, "", 0)
+      const back = (status) => redirect(res, `/?kb-gtasks=${status}`, { "Set-Cookie": cleared })
+      const hit = sessionOf(req)
+      const saved = open(stateKey, parseCookies(req.headers.cookie)[gStateCookie])
+      const state = url.searchParams.get("state") ?? ""
+      const code = url.searchParams.get("code")
+      if (
+        !hit ||
+        !saved ||
+        saved.login !== hit.s.login ||
+        !safeEqual(saved.state, state) ||
+        now() - saved.ts > STATE_TTL ||
+        !code
+      ) {
+        return back(url.searchParams.get("error") === "access_denied" ? "denied" : "error")
+      }
+      try {
+        const t = await google.exchangeCode(code)
+        if (!t.refresh) throw new Error("Google не выдал refresh-токен")
+        tasks.connect(hit.s.login, t)
+      } catch (e) {
+        log.warn?.(`google oauth failed: ${e.message}`)
+        return back("error")
+      }
+      log.info?.(`google tasks connected by ${hit.s.login}`)
+      tasks.run("connect").catch(() => {})
+      back("ok")
+    },
+
+    "POST /api/gtasks/sync": async (req) => {
+      requireSession(req)
+      needTasks()
+      if (!tasks.connected) throw new HttpError(409, "Google Tasks не подключён")
+      try {
+        const stats = await tasks.run("manual")
+        return { ok: true, stats, status: tasks.status() }
+      } catch (e) {
+        throw new HttpError(502, e.message, { status: tasks.status() })
       }
     },
 
+    "POST /api/gtasks/disconnect": async (req) => {
+      requireSession(req)
+      needTasks()
+      tasks.disconnect()
+      return { ok: true }
+    },
+
     "GET /api/file": async (req, res, url) => {
-      const { sid, session } = await requireSession(req)
+      const { sid, token } = await requireToken(req)
       const path = notePath(url.searchParams.get("path"))
-      const file = await currentFile(sid, session.token, path)
+      const file = await currentFile(sid, token, path)
       if (!file) throw new HttpError(404, "Файл не найден")
       return file
     },
 
     "PUT /api/file": async (req) => {
-      const { sid, session } = await requireSession(req)
+      const { sid, token } = await requireToken(req)
       const body = await readJson(req)
       const path = notePath(body.path)
       if (typeof body.content !== "string") throw new BadRequest("Нет содержимого")
@@ -277,7 +395,7 @@ export function createApp(cfg, { github, sessions, now = () => Date.now(), log =
       try {
         const r = await gh(sid, () =>
           github.putFile(
-            session.token,
+            token,
             path,
             Buffer.from(body.content, "utf8").toString("base64"),
             sha,
@@ -287,7 +405,7 @@ export function createApp(cfg, { github, sessions, now = () => Date.now(), log =
         return { path, ...r }
       } catch (e) {
         if (e instanceof GitHubError && (e.status === 409 || e.status === 422)) {
-          const current = await currentFile(sid, session.token, path)
+          const current = await currentFile(sid, token, path)
           if (!sha && current)
             throw new HttpError(409, "Заметка с таким именем уже есть", { error: "exists" })
           throw new HttpError(409, "Файл изменился, пока вы его редактировали", {
@@ -300,14 +418,14 @@ export function createApp(cfg, { github, sessions, now = () => Date.now(), log =
     },
 
     "DELETE /api/file": async (req) => {
-      const { sid, session } = await requireSession(req)
+      const { sid, token } = await requireToken(req)
       const body = await readJson(req)
       const path = notePath(body.path)
       if (!body.sha) throw new BadRequest("Нет версии файла (sha)")
       try {
         return await gh(sid, () =>
           github.deleteFile(
-            session.token,
+            token,
             path,
             String(body.sha),
             `Удалена заметка «${titleOf(path)}» с сайта`,
@@ -322,18 +440,18 @@ export function createApp(cfg, { github, sessions, now = () => Date.now(), log =
     },
 
     "POST /api/move": async (req) => {
-      const { sid, session } = await requireSession(req)
+      const { sid, token } = await requireToken(req)
       const body = await readJson(req)
       const from = notePath(body.from)
       const to = notePath(body.to)
       if (from === to) throw new BadRequest("Путь не изменился")
-      if (await gh(sid, () => github.exists(session.token, to))) {
+      if (await gh(sid, () => github.exists(token, to))) {
         throw new HttpError(409, "По этому пути уже есть файл", { error: "exists" })
       }
       const message = `Перенос «${titleOf(from)}» → ${to} с сайта`
       for (let attempt = 0; ; attempt++) {
         try {
-          const r = await gh(sid, () => github.move(session.token, from, to, message))
+          const r = await gh(sid, () => github.move(token, from, to, message))
           return { path: to, ...r }
         } catch (e) {
           // ветка ушла вперёд между чтением и записью — пробуем ещё раз
@@ -344,36 +462,26 @@ export function createApp(cfg, { github, sessions, now = () => Date.now(), log =
     },
 
     "POST /api/upload": async (req, res, url) => {
-      const { sid, session } = await requireSession(req)
+      const { sid, token } = await requireToken(req)
       const { stem, ext } = uploadName(url.searchParams.get("name") ?? "")
       const buf = await readBody(req, cfg.maxUploadBytes)
       if (buf.length === 0) throw new BadRequest("Пустой файл")
       checkFileContent(ext, buf)
       let name = `${stem}.${ext}`
-      for (
-        let i = 1;
-        await gh(sid, () => github.exists(session.token, `attachments/${name}`));
-        i++
-      ) {
+      for (let i = 1; await gh(sid, () => github.exists(token, `attachments/${name}`)); i++) {
         if (i > 50) throw new HttpError(409, "Не удалось подобрать свободное имя файла")
         name = `${stem}-${i}.${ext}`
       }
       const path = `attachments/${name}`
       const r = await gh(sid, () =>
-        github.putFile(
-          session.token,
-          path,
-          buf.toString("base64"),
-          null,
-          `Вложение ${name} с сайта`,
-        ),
+        github.putFile(token, path, buf.toString("base64"), null, `Вложение ${name} с сайта`),
       )
       return { path, name, ...r }
     },
 
     "GET /api/tree": async (req) => {
-      const { sid, session } = await requireSession(req)
-      const tree = await gh(sid, () => github.tree(session.token))
+      const { sid, token } = await requireToken(req)
+      const tree = await gh(sid, () => github.tree(token))
       const visible = (p) => !p.split("/").some((s) => s.startsWith("."))
       return {
         dirs: tree
@@ -390,13 +498,13 @@ export function createApp(cfg, { github, sessions, now = () => Date.now(), log =
     },
 
     "GET /api/deploy": async (req, res, url) => {
-      const { sid, session } = await requireSession(req)
+      const { sid, token } = await requireToken(req)
       const sha = url.searchParams.get("sha") ?? ""
       if (!/^[0-9a-f]{7,40}$/i.test(sha)) throw new BadRequest("Некорректный sha")
       // кешируем на 4 секунды, чтобы несколько вкладок не долбили GitHub
       const hit = pending.get(sha)
       if (hit && now() - hit.t < 4000) return hit.v
-      const v = await gh(sid, () => github.deployStatus(session.token, sha))
+      const v = await gh(sid, () => github.deployStatus(token, sha))
       pending.set(sha, { t: now(), v })
       if (pending.size > 200) pending.clear()
       return v
@@ -408,8 +516,9 @@ export function createApp(cfg, { github, sessions, now = () => Date.now(), log =
     const key = `${req.method} ${url.pathname.replace(/\/+$/, "")}`
     try {
       const ip = clientIp(req)
-      const isAuth = url.pathname.startsWith("/api/auth/")
-      if (!general.check(ip) || (isAuth && !authLimit.check(ip))) {
+      const isCheck = url.pathname === "/api/auth/check"
+      const isAuth = url.pathname.startsWith("/api/auth/") && !isCheck
+      if (!isCheck && (!general.check(ip) || (isAuth && !authLimit.check(ip)))) {
         throw new HttpError(429, "Слишком много запросов, подождите минуту")
       }
       const route = routes[key]

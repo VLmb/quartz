@@ -158,6 +158,7 @@ export function startMockGitHub({
       const files = new Map(state.commits.get(baseCommit).files)
       for (const e of body.tree) {
         if (e.sha === null) files.delete(e.path)
+        else if (typeof e.content === "string") files.set(e.path, Buffer.from(e.content))
         else {
           const src = [...files.values(), ...state.files.values()].find((b) => blobSha(b) === e.sha)
           files.set(e.path, src)
@@ -186,6 +187,15 @@ export function startMockGitHub({
       state.head = body.sha
       state.log.push(c.message)
       return send(res, 200, { object: { sha: body.sha } })
+    }
+    if (rest.startsWith("/git/blobs/")) {
+      const sha = rest.split("/").pop()
+      const all = [state.files, ...[...state.commits.values()].map((c) => c.files)]
+      for (const m of all)
+        for (const v of m.values())
+          if (blobSha(v) === sha)
+            return send(res, 200, { sha, encoding: "base64", content: v.toString("base64") })
+      return send(res, 404, { message: "Not Found" })
     }
     if (rest.startsWith(`/git/trees/`)) {
       const tree = []

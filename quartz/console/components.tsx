@@ -1006,7 +1006,27 @@ export function Settings() {
             { v: "off", label: "Скрыть" },
           ]}
         />
-        <p class="set-note">Сохраняется в этом браузере.</p>
+        <div class="set-row gt-row" data-gtasks>
+          <span class="set-l">Google Tasks</span>
+          <p class="gt-status" data-gt-status>
+            …
+          </p>
+          <div class="gt-actions">
+            <button type="button" class="gt-btn gt-off-only" data-gt-connect>
+              Подключить
+            </button>
+            <button type="button" class="gt-btn gt-on-only" data-gt-sync>
+              Синхронизировать сейчас
+            </button>
+            <button type="button" class="gt-btn ghost gt-on-only" data-gt-off>
+              Отключить
+            </button>
+          </div>
+          <p class="set-note">
+            Задачи — чекбоксы в папке «Задачи» и строки с тегом #задача в любой заметке.
+          </p>
+        </div>
+        <p class="set-note">Вид сохраняется в этом браузере.</p>
       </div>
     </>
   )

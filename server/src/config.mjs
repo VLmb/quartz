@@ -23,9 +23,19 @@ export function loadConfig(env = process.env) {
     githubApi: (env.GITHUB_API ?? "https://api.github.com").replace(/\/+$/, ""),
     githubWeb: (env.GITHUB_WEB ?? "https://github.com").replace(/\/+$/, ""),
     secureCookies: (env.COOKIE_SECURE ?? "true") !== "false",
-    sessionTtlMs: Number(env.SESSION_TTL_DAYS ?? 30) * 24 * 3600 * 1000,
+    sessionTtlMs: Number(env.SESSION_TTL_DAYS ?? 365) * 24 * 3600 * 1000,
     maxUploadBytes: Number(env.MAX_UPLOAD_MB ?? 10) * 1024 * 1024,
     trustProxy: (env.TRUST_PROXY ?? "true") !== "false",
+    // Google Tasks (необязательно: без GOOGLE_CLIENT_ID синхронизация выключена)
+    googleClientId: env.GOOGLE_CLIENT_ID ?? "",
+    googleClientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
+    googleAuthUrl: env.GOOGLE_AUTH_URL ?? "https://accounts.google.com/o/oauth2/v2/auth",
+    googleTokenUrl: env.GOOGLE_TOKEN_URL ?? "https://oauth2.googleapis.com/token",
+    googleApi: (env.GOOGLE_API ?? "https://tasks.googleapis.com").replace(/\/+$/, ""),
+    gtasksFolder: (env.GTASKS_FOLDER ?? "Задачи").replace(/^\/+|\/+$/g, ""),
+    gtasksTag: env.GTASKS_TAG ?? "#задача",
+    gtasksDefaultList: env.GTASKS_DEFAULT_LIST ?? "",
+    gtasksIntervalMin: Math.max(1, Number(env.GTASKS_INTERVAL_MIN ?? 5)),
   }
   if (cfg.sessionSecret.length < 32) {
     throw new Error("SESSION_SECRET должен быть не короче 32 символов (openssl rand -hex 32)")
