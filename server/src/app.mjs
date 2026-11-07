@@ -2,6 +2,7 @@ import { BadRequest, checkFileContent, notePath, titleOf, uploadName } from "./p
 import { deriveKey, open, randomId, safeEqual, seal } from "./crypto.mjs"
 import { GitHubError } from "./github.mjs"
 import { SecretStore } from "./store.mjs"
+import { addItem, publicItems, removeItem, updateItem } from "./inbox-md.mjs"
 import { TokenError, TokenKeeper } from "./tokens.mjs"
 
 const JSON_LIMIT = 2 * 1024 * 1024
@@ -198,6 +199,68 @@ export function createApp(
     }
   }
 
+  /* Inbox.md: читаем, меняем и записываем с повтором, если файл успели поменять */
+  async function readInbox(sid, token) {
+    const f = await currentFile(sid, token, cfg.inboxPath)
+    return f ?? { sha: null, content: "" }
+  }
+
+  async function mutateInbox(sid, token, change, message) {
+    for (let attempt = 0; ; attempt++) {
+      const f = await readInbox(sid, token)
+      const next = change(f.content)
+      if (next === null)
+        throw new HttpError(409, "Эта мысль уже изменилась — обновите список", { error: "gone" })
+      try {
+        const r = await gh(sid, () =>
+          github.putFile(
+            token,
+            cfg.inboxPath,
+            Buffer.from(next, "utf8").toString("base64"),
+            f.sha,
+            message,
+          ),
+        )
+        return { sha: r.sha, commit: r.commit, items: publicItems(next) }
+      } catch (e) {
+        if (e instanceof GitHubError && (e.status === 409 || e.status === 422) && attempt < 2)
+          continue
+        throw e
+      }
+    }
+  }
+
+  const inboxText = (v) => {
+    const t = typeof v === "string" ? v.replace(/\r\n/g, "\n").trim() : ""
+    if (!t) throw new BadRequest("Пустая мысль")
+    if (t.length > 20000) throw new BadRequest("Слишком длинный текст")
+    return t
+  }
+
+  /** Доска задач: ошибки Google превращаем в понятные ответы. */
+  async function board(fn) {
+    needTasks()
+    if (!tasks.connected) throw new HttpError(409, "Google Tasks не подключён", { error: "gtasks" })
+    try {
+      return await fn()
+    } catch (e) {
+      if (e.status === 404)
+        throw new HttpError(404, "Задача или список не найдены — обновите страницу")
+      if (e.status === 400) throw new BadRequest(e.message)
+      if (e instanceof HttpError) throw e
+      throw new HttpError(502, e.message || "Google Tasks не ответил")
+    }
+  }
+  const str = (v, name) => {
+    if (typeof v !== "string" || !v || v.length > 300) throw new BadRequest(`Нет поля ${name}`)
+    return v
+  }
+  const dateOrNull = (v) => {
+    if (v === null || v === "") return null
+    if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v
+    throw new BadRequest("Дата в формате ГГГГ-ММ-ДД")
+  }
+
   function needTasks() {
     if (!google?.enabled || !tasks) {
       throw new HttpError(501, "Google Tasks не настроен на сервере (GOOGLE_CLIENT_ID)")
@@ -364,6 +427,105 @@ export function createApp(
       } catch (e) {
         throw new HttpError(502, e.message, { status: tasks.status() })
       }
+    },
+
+    /* ───── Inbox ───── */
+
+    "GET /api/inbox": async (req) => {
+      const { sid, token } = await requireToken(req)
+      const f = await readInbox(sid, token)
+      return { sha: f.sha, path: cfg.inboxPath, items: publicItems(f.content) }
+    },
+
+    "POST /api/inbox": async (req) => {
+      const { sid, token } = await requireToken(req)
+      const body = await readJson(req)
+      const text = inboxText(body.text)
+      const at =
+        typeof body.at === "string" && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(body.at)
+          ? body.at
+          : null
+      const [date, time] = (
+        at ?? new Date(now()).toISOString().slice(0, 16).replace("T", " ")
+      ).split(" ")
+      return mutateInbox(sid, token, (c) => addItem(c, { date, time, text }), "Inbox: новая мысль")
+    },
+
+    "PUT /api/inbox": async (req) => {
+      const { sid, token } = await requireToken(req)
+      const body = await readJson(req)
+      const text = inboxText(body.text)
+      const id = str(body.id, "id")
+      return mutateInbox(sid, token, (c) => updateItem(c, id, text), "Inbox: правка мысли")
+    },
+
+    "DELETE /api/inbox": async (req) => {
+      const { sid, token } = await requireToken(req)
+      const body = await readJson(req)
+      const id = str(body.id, "id")
+      return mutateInbox(sid, token, (c) => removeItem(c, id), "Inbox: мысль удалена")
+    },
+
+    /* ───── доска задач ───── */
+
+    "GET /api/gtasks/board": async (req) => {
+      requireSession(req)
+      return board(() => tasks.board())
+    },
+
+    "POST /api/gtasks/task": async (req) => {
+      requireSession(req)
+      const b = await readJson(req)
+      return board(() =>
+        tasks.createTask({
+          listId: str(b.listId, "listId"),
+          title: inboxText(b.title),
+          due: b.due ? dateOrNull(b.due) : null,
+          notes: typeof b.notes === "string" ? b.notes : "",
+          previous: typeof b.previous === "string" ? b.previous : null,
+        }),
+      )
+    },
+
+    "PATCH /api/gtasks/task": async (req) => {
+      requireSession(req)
+      const b = await readJson(req)
+      return board(() =>
+        tasks.updateTask({
+          listId: str(b.listId, "listId"),
+          id: str(b.id, "id"),
+          title: b.title === undefined ? undefined : inboxText(b.title),
+          notes: typeof b.notes === "string" ? b.notes : undefined,
+          due: b.due === undefined ? undefined : dateOrNull(b.due),
+          done: typeof b.done === "boolean" ? b.done : undefined,
+        }),
+      )
+    },
+
+    "DELETE /api/gtasks/task": async (req) => {
+      requireSession(req)
+      const b = await readJson(req)
+      await board(() => tasks.removeTask({ listId: str(b.listId, "listId"), id: str(b.id, "id") }))
+      return { ok: true }
+    },
+
+    "POST /api/gtasks/move": async (req) => {
+      requireSession(req)
+      const b = await readJson(req)
+      return board(() =>
+        tasks.moveTask({
+          listId: str(b.listId, "listId"),
+          id: str(b.id, "id"),
+          previous: typeof b.previous === "string" ? b.previous : null,
+          toListId: typeof b.toListId === "string" ? b.toListId : null,
+        }),
+      )
+    },
+
+    "PUT /api/gtasks/prefs": async (req) => {
+      requireSession(req)
+      needTasks()
+      return tasks.setPrefs(await readJson(req))
     },
 
     "POST /api/gtasks/disconnect": async (req) => {

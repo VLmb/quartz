@@ -96,11 +96,12 @@ function syncThemeColor() {
       .querySelectorAll('meta[name="theme-color"]')
       .forEach((m) => m.setAttribute("content", bg))
 }
-function setTheme(t: "light" | "dark") {
+function setTheme(t: "light" | "dark", persist = true) {
   html.setAttribute("saved-theme", t)
-  try {
-    localStorage.setItem("theme", t)
-  } catch {}
+  if (persist)
+    try {
+      localStorage.setItem("theme", t)
+    } catch {}
   syncThemeColor()
   document.dispatchEvent(new CustomEvent("themechange", { detail: { theme: t } }))
 }
@@ -115,7 +116,7 @@ const VIEW_DEFAULT: Record<ViewOpt, string> = {
 }
 const VIEW_ALLOWED: Record<ViewOpt, string[]> = {
   skin: ["linear", "github", "console"],
-  theme: ["dark", "light"],
+  theme: ["dark", "light", "auto"],
   width: ["narrow", "normal", "wide", "full"],
   fs: ["s", "m", "l", "xl"],
   panel: ["on", "off"],
@@ -134,7 +135,15 @@ const VIEW_KEY: Record<ViewOpt, string> = {
   fs: "kb-fs",
   panel: "kb-panel",
 }
+const systemTheme = () => (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
+function themePref(): string {
+  try {
+    if (localStorage.getItem("theme") === "auto") return "auto"
+  } catch {}
+  return html.getAttribute("saved-theme") === "light" ? "light" : "dark"
+}
 function viewGet(o: ViewOpt): string {
+  if (o === "theme") return themePref()
   const v = html.getAttribute(VIEW_ATTR[o])
   return v && VIEW_ALLOWED[o].includes(v) ? v : VIEW_DEFAULT[o]
 }
@@ -147,6 +156,13 @@ function markSettings() {
       b.setAttribute("aria-checked", String(on))
     })
   })
+  const fs = VIEW_ALLOWED.fs.indexOf(viewGet("fs"))
+  document
+    .querySelectorAll<HTMLInputElement>("[data-fs-range]")
+    .forEach((r) => (r.value = String(fs)))
+  document
+    .querySelectorAll<HTMLElement>("[data-fs-label]")
+    .forEach((l) => (l.textContent = ["90%", "100%", "112%", "125%"][fs] ?? "100%"))
   const panelOn = viewGet("panel") === "on"
   document
     .querySelectorAll<HTMLElement>("[data-panel-toggle]")
@@ -155,7 +171,13 @@ function markSettings() {
 function setView(o: ViewOpt, v: string) {
   if (!VIEW_ALLOWED[o].includes(v)) return
   if (o === "theme") {
-    if (viewGet("theme") !== v) toggleTheme()
+    if (v === "auto") {
+      try {
+        localStorage.setItem("theme", "auto")
+      } catch {}
+      setTheme(systemTheme(), false)
+    } else setTheme(v as "light" | "dark")
+    markSettings()
     return
   }
   // значения по умолчанию не пишем в атрибут: так CSS проще
@@ -171,13 +193,31 @@ function setView(o: ViewOpt, v: string) {
     document.dispatchEvent(new CustomEvent("themechange", { detail: { theme: t } }))
   }
 }
-function openSettings() {
+const SET_TITLES: Record<string, string> = {
+  view: "Вид",
+  gtasks: "Google Tasks",
+  account: "Аккаунт",
+}
+function settingsTab(tab: string) {
+  if (!SET_TITLES[tab]) tab = "view"
+  document
+    .querySelectorAll<HTMLElement>("[data-set-tab]")
+    .forEach((b) => b.classList.toggle("on", b.dataset.setTab === tab))
+  document
+    .querySelectorAll<HTMLElement>("[data-set-pane]")
+    .forEach((p) => (p.hidden = p.dataset.setPane !== tab))
+  const t = document.querySelector<HTMLElement>("[data-set-title]")
+  if (t) t.textContent = SET_TITLES[tab]
+  store.set("kb-set-tab", tab)
+  if (tab === "gtasks") gtStatus()
+}
+function openSettings(tab?: string) {
   html.classList.remove("drawer-open")
   closePalette()
   markSettings()
+  settingsTab(tab ?? store.get<string>("kb-set-tab", "view") ?? "view")
   html.classList.add("settings-open")
-  gtStatus()
-  document.querySelector<HTMLElement>("[data-settings-dialog] .set-seg button.on")?.focus()
+  document.querySelector<HTMLElement>("[data-settings-dialog] .set-nav button.on")?.focus()
 }
 function closeSettings() {
   html.classList.remove("settings-open")
@@ -232,6 +272,7 @@ async function shareCurrent() {
 
 function toggleTheme() {
   const next = html.getAttribute("saved-theme") === "dark" ? "light" : "dark"
+  queueMicrotask(markSettings)
   const d = document as Document & { startViewTransition?: (cb: () => void) => unknown }
   if (d.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
     html.classList.add("theme-anim")
@@ -589,6 +630,44 @@ type EditorModule = {
   isOpen: () => boolean
   toast: (html: string, o?: { kind?: string; timeout?: number }) => unknown
 }
+/* ── пространства (Задачи, Inbox): отдельный файл, грузится по требованию ── */
+type SpacesModule = {
+  init: (o: { root: string; flash: (m: string) => void }) => void
+  onNav: () => void
+  capture: () => void
+  captureOpen: () => boolean
+}
+let spacesModule: SpacesModule | null = null
+let spacesLoading: Promise<SpacesModule> | null = null
+function loadSpaces(): Promise<SpacesModule> {
+  if (!spacesLoading) {
+    const file = document.querySelector<HTMLElement>("[data-spaces-url]")?.dataset.spacesUrl
+    if (!file) return Promise.reject(new Error("Нет модуля пространств"))
+    spacesLoading = import(new URL(file, rootUrl()).toString()).then((m: SpacesModule) => {
+      m.init({ root: rootUrl().pathname, flash })
+      spacesModule = m
+      return m
+    })
+    spacesLoading.catch(() => (spacesLoading = null))
+  }
+  return spacesLoading
+}
+function spacesOnNav() {
+  if (document.querySelector("[data-space-root]"))
+    loadSpaces()
+      .then((m) => m.onNav())
+      .catch(() => {})
+  else spacesModule?.onNav()
+}
+function capture() {
+  html.classList.remove("drawer-open")
+  if (!html.classList.contains("kb-api"))
+    return flash("Записывать мысли можно, когда сервер доступен")
+  loadSpaces()
+    .then((m) => m.capture())
+    .catch(() => flash("Не удалось открыть запись мысли"))
+}
+
 let editorModule: EditorModule | null = null
 let editorLoading: Promise<EditorModule> | null = null
 
@@ -783,6 +862,16 @@ function bindGlobal() {
       toggleTheme()
       return
     }
+    const tab = t.closest<HTMLElement>("[data-set-tab]")
+    if (tab) {
+      settingsTab(tab.dataset.setTab!)
+      return
+    }
+    if (t.closest("[data-capture]")) {
+      ev.preventDefault()
+      capture()
+      return
+    }
     const optBtn = t.closest<HTMLElement>("[data-opt] button[data-v]")
     if (optBtn) {
       const o = optBtn.closest<HTMLElement>("[data-opt]")!.dataset.opt as ViewOpt
@@ -906,6 +995,7 @@ function bindGlobal() {
 
   document.addEventListener("input", (ev) => {
     const t = ev.target as HTMLInputElement
+    if (t.matches("[data-fs-range]")) setView("fs", VIEW_ALLOWED.fs[Number(t.value)] ?? "m")
     if (t.matches("[data-palette-input]")) runSearch(t.value)
   })
 
@@ -953,6 +1043,15 @@ function bindGlobal() {
       openPalette()
       return
     }
+    if (
+      (ev.code === "KeyI" || ev.key === "i") &&
+      html.classList.contains("kb-auth") &&
+      !spacesModule?.captureOpen()
+    ) {
+      ev.preventDefault()
+      capture()
+      return
+    }
     if (ev.key === "e" && html.classList.contains("kb-auth") && currentNotePath()) {
       ev.preventDefault()
       editCurrent()
@@ -995,6 +1094,7 @@ function bindGlobal() {
 /* ───────────── каждая навигация ───────────── */
 function onNav() {
   editorModule?.onNav()
+  spacesOnNav()
   applyMe(html.classList.contains("kb-auth") ? store.get<Me | null>("kb-me", null) : null)
   closePalette()
   html.classList.remove("drawer-open")
@@ -1032,6 +1132,9 @@ function onNav() {
 
 bindGlobal()
 document.addEventListener("themechange", () => markSettings())
+matchMedia("(prefers-color-scheme: light)").addEventListener?.("change", () => {
+  if (themePref() === "auto") setTheme(systemTheme(), false)
+})
 document.addEventListener("nav", onNav)
 if (new URLSearchParams(location.search).has("search")) setTimeout(openPalette, 300)
 document.addEventListener("render", () => enhanceCode())

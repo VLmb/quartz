@@ -32,6 +32,7 @@ export function loadConfig(env = process.env) {
     googleAuthUrl: env.GOOGLE_AUTH_URL ?? "https://accounts.google.com/o/oauth2/v2/auth",
     googleTokenUrl: env.GOOGLE_TOKEN_URL ?? "https://oauth2.googleapis.com/token",
     googleApi: (env.GOOGLE_API ?? "https://tasks.googleapis.com").replace(/\/+$/, ""),
+    inboxPath: env.INBOX_PATH ?? "Inbox.md",
     gtasksFolder: (env.GTASKS_FOLDER ?? "Задачи").replace(/^\/+|\/+$/g, ""),
     gtasksTag: env.GTASKS_TAG ?? "#задача",
     gtasksDefaultList: env.GTASKS_DEFAULT_LIST ?? "",

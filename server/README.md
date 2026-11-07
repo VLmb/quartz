@@ -92,7 +92,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 1. [console.cloud.google.com](https://console.cloud.google.com) → создайте проект (например, `vlmb-kb`).
 2. **APIs & Services → Library → Google Tasks API → Enable.**
-3. **Google Auth Platform → Branding:** имя приложения, ваша почта. **Audience:** External, затем **Publish app** (статус *In production*). В статусе *Testing* Google отзывает доступ каждые 7 дней. Проверка приложения Google не нужна: при подключении будет предупреждение «приложение не проверено» → «Дополнительно» → «Перейти».
+3. **Google Auth Platform → Branding:** имя приложения, ваша почта. **Audience:** External, затем **Publish app** (статус _In production_). В статусе _Testing_ Google отзывает доступ каждые 7 дней. Проверка приложения Google не нужна: при подключении будет предупреждение «приложение не проверено» → «Дополнительно» → «Перейти».
 4. **Clients → Create client → Web application.** Authorized redirect URI: `https://ваш-домен/api/gtasks/callback`.
 5. Client ID и Client secret впишите в `/etc/kb-api.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) и перезапустите: `sudo systemctl restart kb-api`.
 6. На сайте: **Настройки → Google Tasks → Подключить.**
@@ -165,3 +165,13 @@ npm test            # 13 сценариев на поддельном GitHub (te
 | GET    | `/api/gtasks/connect`        | подключить Google Tasks (OAuth)                       |
 | POST   | `/api/gtasks/sync`           | синхронизировать сейчас                               |
 | POST   | `/api/gtasks/disconnect`     | отключить                                             |
+| GET    | `/api/gtasks/board`          | списки и задачи из Google + порядок/скрытые списки    |
+| POST   | `/api/gtasks/task`           | новая задача `{listId, title, due?, previous?}`       |
+| PATCH  | `/api/gtasks/task`           | правка `{listId, id, title?, notes?, due?, done?}`    |
+| DELETE | `/api/gtasks/task`           | удалить `{listId, id}`                                |
+| POST   | `/api/gtasks/move`           | перестановка `{listId, id, previous?, toListId?}`     |
+| PUT    | `/api/gtasks/prefs`          | порядок, свёрнутые и скрытые списки                   |
+| GET    | `/api/inbox`                 | мысли из `Inbox.md`                                   |
+| POST   | `/api/inbox`                 | новая мысль `{text, at?}` (сверху списка)             |
+| PUT    | `/api/inbox`                 | дописать `{id, text}`                                 |
+| DELETE | `/api/inbox`                 | удалить `{id}`                                        |

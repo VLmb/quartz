@@ -136,8 +136,31 @@ export class Google {
     return out
   }
 
-  createTask(access, listId, task) {
-    return this.request(access, "POST", `/tasks/v1/lists/${encodeURIComponent(listId)}/tasks`, task)
+  createTask(access, listId, task, query = "") {
+    return this.request(
+      access,
+      "POST",
+      `/tasks/v1/lists/${encodeURIComponent(listId)}/tasks${query ? `?${query}` : ""}`,
+      task,
+    )
+  }
+
+  /** Перемещение: previous — после какой задачи, destinationTasklist — в другой список. */
+  moveTask(
+    access,
+    listId,
+    id,
+    { previous = null, parent = null, destinationTasklist = null } = {},
+  ) {
+    const q = new URLSearchParams()
+    if (previous) q.set("previous", previous)
+    if (parent) q.set("parent", parent)
+    if (destinationTasklist) q.set("destinationTasklist", destinationTasklist)
+    return this.request(
+      access,
+      "POST",
+      `/tasks/v1/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(id)}/move?${q}`,
+    )
   }
 
   patchTask(access, listId, id, patch) {

@@ -2,6 +2,7 @@ import { QuartzComponentProps } from "../components/types"
 import { QuartzPluginData } from "../plugins/vfile"
 import { Icon } from "./icons"
 import { FullSlug, pathToRoot } from "../util/path"
+import { INBOX_SLUG, TASKS_SLUG, spaceOfSlug } from "./data"
 import {
   backlinksOf,
   desc,
@@ -280,6 +281,7 @@ export function Sidebar({ fileData, allFiles, cfg }: P) {
   const tree = buildTree(allFiles)
   const current = fileData.slug ?? "index"
   const kind = pageKind(current)
+  const space = spaceOfSlug(current)
   const total = countFiles(tree)
   return (
     <aside class="side" data-explorer>
@@ -305,6 +307,18 @@ export function Sidebar({ fileData, allFiles, cfg }: P) {
           <Icon name="home" />
           Главная
         </a>
+        <a
+          href={href(current, TASKS_SLUG)}
+          class={`nav-i ${space === "tasks" ? "on" : ""}`}
+          data-nav-space="tasks"
+        >
+          <Icon name="tasks" />
+          Задачи
+        </a>
+        <a href={href(current, INBOX_SLUG)} class={`nav-i ${space === "inbox" ? "on" : ""}`}>
+          <Icon name="inbox" />
+          Inbox
+        </a>
         <a href={href(current, "tags/index")} class={`nav-i ${kind === "tag" ? "on" : ""}`}>
           <Icon name="hash" />
           Теги
@@ -329,10 +343,6 @@ export function Sidebar({ fileData, allFiles, cfg }: P) {
       </ul>
       <div class="sb-foot">
         <Account />
-        <span class="sync">
-          <i></i>
-          <Ago ts={lastUpdate(allFiles)} prefix="обновлено " />
-        </span>
         <button type="button" class="sb-settings" data-settings title="Настройки ( , )">
           <Icon name="sliders" />
           Настройки
@@ -698,6 +708,20 @@ export function CActbar({ fileData }: P) {
         <Icon name="search" />
       </button>
       <a
+        href={href(fileData.slug, TASKS_SLUG)}
+        class={`act ${spaceOfSlug(fileData.slug) === "tasks" ? "on" : ""}`}
+        title="Задачи"
+      >
+        <Icon name="tasks" />
+      </a>
+      <a
+        href={href(fileData.slug, INBOX_SLUG)}
+        class={`act ${spaceOfSlug(fileData.slug) === "inbox" ? "on" : ""}`}
+        title="Inbox (I — записать мысль)"
+      >
+        <Icon name="inbox" />
+      </a>
+      <a
         href={href(fileData.slug, "tags/index")}
         class={`act ${kind === "tag" ? "on" : ""}`}
         title="Теги"
@@ -862,28 +886,27 @@ export function CStatusbar({ fileData, allFiles }: P) {
 
 export function MobileTabs({ fileData }: P) {
   const kind = pageKind(fileData.slug)
+  const space = spaceOfSlug(fileData.slug)
   return (
     <nav class="m-tabs">
-      <a href={href(fileData.slug, "index")} class={`mt ${kind === "home" ? "on" : ""}`}>
+      <a href={href(fileData.slug, "index")} class={`mt ${kind === "home" && !space ? "on" : ""}`}>
         <Icon name="home" />
         <span>Главная</span>
       </a>
+      <a href={href(fileData.slug, TASKS_SLUG)} class={`mt ${space === "tasks" ? "on" : ""}`}>
+        <Icon name="tasks" />
+        <span>Задачи</span>
+      </a>
+      <button type="button" class="mt mt-plus kb-api-only" data-capture aria-label="Записать мысль">
+        <Icon name="plus" />
+      </button>
+      <a href={href(fileData.slug, INBOX_SLUG)} class={`mt ${space === "inbox" ? "on" : ""}`}>
+        <Icon name="inbox" />
+        <span>Inbox</span>
+      </a>
       <button type="button" data-drawer class="mt">
         <Icon name="folder" />
-        <span>Файлы</span>
-      </button>
-      <button type="button" data-search class="mt">
-        <Icon name="search" />
-        <span>Поиск</span>
-      </button>
-      <button type="button" data-settings class="mt">
-        <Icon name="sliders" />
-        <span>Вид</span>
-      </button>
-      <button type="button" class="mt tt" data-theme-toggle>
-        <Icon name="sun" cls="i-sun" />
-        <Icon name="moon" cls="i-moon" />
-        <span>Тема</span>
+        <span>Хранилище</span>
       </button>
     </nav>
   )
@@ -921,112 +944,157 @@ export function Palette() {
   )
 }
 
-/* ───────────── настройки вида ───────────── */
+/* ───────────── настройки ───────────── */
 
-type Opt = { v: string; label: string; cls?: string }
-function SetRow({
-  label,
-  opt,
-  items,
-  cls,
-}: {
-  label: string
-  opt: string
-  items: Opt[]
-  cls?: string
-}) {
+function Seg({ opt, label, items }: { opt: string; label: string; items: [string, string][] }) {
   return (
-    <div class={`set-row ${cls ?? ""}`}>
-      <span class="set-l">{label}</span>
-      <div class="set-seg" role="radiogroup" aria-label={label} data-opt={opt}>
-        {items.map((o) => (
-          <button type="button" role="radio" data-v={o.v} class={o.cls}>
-            {o.label}
-          </button>
-        ))}
-      </div>
+    <div class="set-seg" role="radiogroup" aria-label={label} data-opt={opt}>
+      {items.map(([v, text]) => (
+        <button type="button" role="radio" data-v={v}>
+          {text}
+        </button>
+      ))}
     </div>
   )
 }
+
+const SKINS: { v: string; name: string; cls: string }[] = [
+  { v: "linear", name: "Linear", cls: "pv-linear" },
+  { v: "github", name: "GitHub", cls: "pv-github" },
+  { v: "console", name: "Консоль", cls: "pv-console" },
+]
 
 export function Settings() {
   return (
     <>
       <div class="set-backdrop" data-settings-close></div>
       <div class="settings" role="dialog" aria-label="Настройки" data-settings-dialog>
-        <div class="set-h">
-          <b>Настройки</b>
-          <button type="button" class="set-x" data-settings-close aria-label="Закрыть">
-            <Icon name="x" />
+        <nav class="set-nav" aria-label="Разделы настроек">
+          <b class="set-h">Настройки</b>
+          <button type="button" data-set-tab="view" class="on">
+            Вид
           </button>
-        </div>
-        <SetRow
-          label="Оформление"
-          opt="skin"
-          items={[
-            { v: "linear", label: "Linear" },
-            { v: "github", label: "GitHub" },
-            { v: "console", label: "Консоль" },
-          ]}
-        />
-        <SetRow
-          label="Тема"
-          opt="theme"
-          items={[
-            { v: "dark", label: "Тёмная" },
-            { v: "light", label: "Светлая" },
-          ]}
-        />
-        <SetRow
-          label="Ширина текста"
-          opt="width"
-          items={[
-            { v: "narrow", label: "Узкая" },
-            { v: "normal", label: "Обычная" },
-            { v: "wide", label: "Широкая" },
-            { v: "full", label: "Во всю" },
-          ]}
-        />
-        <SetRow
-          label="Размер шрифта"
-          opt="fs"
-          items={[
-            { v: "s", label: "A", cls: "fs-s" },
-            { v: "m", label: "A", cls: "fs-m" },
-            { v: "l", label: "A", cls: "fs-l" },
-            { v: "xl", label: "A", cls: "fs-xl" },
-          ]}
-        />
-        <SetRow
-          label="Правая панель"
-          opt="panel"
-          cls="set-desk"
-          items={[
-            { v: "on", label: "Показывать" },
-            { v: "off", label: "Скрыть" },
-          ]}
-        />
-        <div class="set-row gt-row" data-gtasks>
-          <span class="set-l">Google Tasks</span>
-          <p class="gt-status" data-gt-status>
-            …
-          </p>
-          <div class="gt-actions">
-            <button type="button" class="gt-btn gt-off-only" data-gt-connect>
-              Подключить
-            </button>
-            <button type="button" class="gt-btn gt-on-only" data-gt-sync>
-              Синхронизировать сейчас
-            </button>
-            <button type="button" class="gt-btn ghost gt-on-only" data-gt-off>
-              Отключить
+          <button type="button" data-set-tab="gtasks" class="kb-auth-only">
+            Google Tasks
+          </button>
+          <button type="button" data-set-tab="account">
+            Аккаунт
+          </button>
+        </nav>
+        <div class="set-body">
+          <div class="set-top">
+            <h2 data-set-title>Вид</h2>
+            <button type="button" class="set-x" data-settings-close aria-label="Закрыть">
+              <Icon name="x" />
             </button>
           </div>
-          <p class="set-note">
-            Задачи — чекбоксы в папке «Задачи» и строки с тегом #задача в любой заметке.
-          </p>
+
+          <section class="set-pane" data-set-pane="view">
+            <div class="set-block">
+              <span class="set-l">Оформление</span>
+              <div class="set-skins" role="radiogroup" aria-label="Оформление" data-opt="skin">
+                {SKINS.map((k) => (
+                  <button type="button" role="radio" data-v={k.v} class="set-skin">
+                    <span class={`pv ${k.cls}`} aria-hidden="true">
+                      <i class="pv-side"></i>
+                      <span class="pv-main">
+                        <i class="pv-h"></i>
+                        <i class="pv-t"></i>
+                        <i class="pv-t short"></i>
+                      </span>
+                    </span>
+                    <span class="set-skin-n">{k.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div class="set-line">
+              <span class="set-l">Тема</span>
+              <Seg
+                opt="theme"
+                label="Тема"
+                items={[
+                  ["dark", "Тёмная"],
+                  ["light", "Светлая"],
+                  ["auto", "Авто"],
+                ]}
+              />
+            </div>
+            <div class="set-block">
+              <div class="set-line">
+                <label class="set-l" for="set-fs">
+                  Размер текста
+                </label>
+                <span class="set-v" data-fs-label>
+                  100%
+                </span>
+              </div>
+              <input
+                id="set-fs"
+                class="set-range"
+                type="range"
+                min="0"
+                max="3"
+                step="1"
+                data-fs-range
+              />
+              <p class="set-sample">Read Committed не даёт читать незафиксированные изменения.</p>
+            </div>
+            <div class="set-line">
+              <span class="set-l">Ширина текста</span>
+              <Seg
+                opt="width"
+                label="Ширина текста"
+                items={[
+                  ["narrow", "Узкая"],
+                  ["normal", "Обычная"],
+                  ["wide", "Широкая"],
+                  ["full", "Во всю"],
+                ]}
+              />
+            </div>
+          </section>
+
+          <section class="set-pane gt-row" data-set-pane="gtasks" data-gtasks hidden>
+            <p class="gt-status" data-gt-status>
+              …
+            </p>
+            <div class="gt-actions">
+              <button type="button" class="gt-btn gt-off-only" data-gt-connect>
+                Подключить
+              </button>
+              <button type="button" class="gt-btn ghost gt-on-only" data-gt-sync>
+                Синхронизировать сейчас
+              </button>
+              <button type="button" class="gt-btn ghost gt-on-only" data-gt-off>
+                Отключить
+              </button>
+            </div>
+            <p class="set-note">
+              Задачи — чекбоксы в папке «Задачи» (заметка = список) и строки с тегом #задача в любой
+              заметке. Синхронизация каждые 5 минут.
+            </p>
+          </section>
+
+          <section class="set-pane" data-set-pane="account" hidden>
+            <div class="set-acc kb-auth-only">
+              <img class="set-ava" data-account-avatar alt="" hidden />
+              <span class="set-acc-n" data-account-login></span>
+              <button type="button" class="gt-btn ghost" data-logout>
+                Выйти
+              </button>
+            </div>
+            <div class="set-acc kb-anon-only">
+              <span class="set-acc-n">Вы не вошли</span>
+              <button type="button" class="gt-btn" data-login>
+                Войти через GitHub
+              </button>
+            </div>
+            <p class="set-note">
+              Вид (оформление, тема, размер и ширина текста) хранится в этом браузере.
+            </p>
+          </section>
         </div>
-        <p class="set-note">Вид сохраняется в этом браузере.</p>
       </div>
     </>
   )

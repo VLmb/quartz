@@ -137,6 +137,116 @@ export class TaskSync {
     return this.running
   }
 
+  /* ───── доска задач для сайта: Google напрямую, порядок списков — у нас ───── */
+
+  /** Синхронизация с заметками через несколько секунд после правок с сайта. */
+  soon(delayMs = 4000) {
+    clearTimeout(this.soonTimer)
+    this.soonTimer = setTimeout(() => this.run("site").catch(() => {}), delayMs)
+    this.soonTimer.unref?.()
+  }
+
+  prefs() {
+    const p = this.store.get("prefs", {})
+    return {
+      order: Array.isArray(p.order) ? p.order : [],
+      collapsed: Array.isArray(p.collapsed) ? p.collapsed : [],
+      hidden: Array.isArray(p.hidden) ? p.hidden : [],
+    }
+  }
+
+  setPrefs(p) {
+    const clean = (a) =>
+      Array.isArray(a)
+        ? [...new Set(a.filter((x) => typeof x === "string" && x.length < 200))].slice(0, 200)
+        : []
+    const next = { order: clean(p.order), collapsed: clean(p.collapsed), hidden: clean(p.hidden) }
+    this.store.set("prefs", next)
+    return next
+  }
+
+  async board() {
+    const access = await this.googleAccess()
+    const lists = await this.google.lists(access)
+    const map = this.store.get("map", {})
+    const out = []
+    for (const l of lists) {
+      const tasks = (await this.google.tasks(access, l.id))
+        .filter((t) => !t.deleted && (t.title ?? "").trim())
+        .sort((a, b) => String(a.position ?? "").localeCompare(String(b.position ?? "")))
+        .map((t) => ({
+          id: t.id,
+          title: (t.title ?? "").trim(),
+          notes: t.notes ?? "",
+          due: fromGoogleDate(t.due),
+          done: t.status === "completed",
+          completed: t.completed ?? null,
+          parent: t.parent ?? null,
+          note:
+            map[t.id]?.path && !map[t.id].path.startsWith(this.cfg.gtasksFolder + "/")
+              ? map[t.id].path
+              : null,
+        }))
+      out.push({ id: l.id, title: l.title, tasks })
+    }
+    // порядок списков: сохранённый, новые — в конец
+    const prefs = this.prefs()
+    const rank = new Map(prefs.order.map((id, i) => [id, i]))
+    out.sort((a, b) => (rank.get(a.id) ?? 1e6) - (rank.get(b.id) ?? 1e6))
+    return { lists: out, prefs }
+  }
+
+  async createTask({ listId, title, due, notes, parent, previous }) {
+    const access = await this.googleAccess()
+    const q = new URLSearchParams()
+    if (parent) q.set("parent", parent)
+    if (previous) q.set("previous", previous)
+    const t = await this.google.createTask(
+      access,
+      listId,
+      {
+        title: String(title).trim().slice(0, 1000),
+        ...(due ? { due: toGoogleDue(due) } : {}),
+        ...(notes ? { notes: String(notes).slice(0, 8000) } : {}),
+      },
+      q.toString(),
+    )
+    this.soon()
+    return t
+  }
+
+  async updateTask({ listId, id, title, notes, due, done }) {
+    const access = await this.googleAccess()
+    const patch = {}
+    if (title !== undefined) patch.title = String(title).trim().slice(0, 1000)
+    if (notes !== undefined) patch.notes = String(notes).slice(0, 8000)
+    if (due !== undefined) patch.due = due ? toGoogleDue(due) : null
+    if (done !== undefined) {
+      patch.status = done ? "completed" : "needsAction"
+      if (!done) patch.completed = null
+    }
+    const t = await this.google.patchTask(access, listId, id, patch)
+    this.soon()
+    return t
+  }
+
+  async removeTask({ listId, id }) {
+    const access = await this.googleAccess()
+    await this.google.deleteTask(access, listId, id)
+    this.soon()
+  }
+
+  /** Перестановка: previous — задача, после которой встать (null — первой); можно в другой список. */
+  async moveTask({ listId, id, previous, toListId }) {
+    const access = await this.googleAccess()
+    const t = await this.google.moveTask(access, listId, id, {
+      previous: previous || null,
+      destinationTasklist: toListId && toListId !== listId ? toListId : null,
+    })
+    this.soon()
+    return t
+  }
+
   async readFile(token, entry) {
     const hit = this.blobCache.get(entry.sha)
     if (hit !== undefined) return hit
@@ -214,6 +324,25 @@ export class TaskSync {
       }
     }
 
+    const appendLine = (path, line) => {
+      if (!files.has(path)) {
+        files.set(path, {
+          lines: ["---", "tags: [задачи]", "---", ""],
+          changed: true,
+          created: true,
+        })
+      }
+      const f = files.get(path)
+      while (f.lines.length && f.lines[f.lines.length - 1] === "") f.lines.pop()
+      if (f.lines[f.lines.length - 1] === "---") f.lines.push("") // пустая строка после шапки
+      f.lines.push(line, "")
+      f.changed = true
+    }
+    const listIdOfFile = (path) => {
+      const name = path.split("/").pop().replace(/\.md$/i, "")
+      return listByTitle.get(name.toLowerCase())?.id ?? null
+    }
+
     const createInGoogle = async (path, obs) => {
       const list = await listFor(path)
       const noteTitle = path.split("/").pop().replace(/\.md$/i, "")
@@ -229,9 +358,12 @@ export class TaskSync {
     }
 
     /* 1. Проход по заметкам */
-    for (const [path, f] of files) {
+    // снимок до правок: строки, перенесённые в другую заметку по ходу прохода, не читаем второй раз
+    const snapshot = [...files].map(([path, f]) => [path, f.lines.join("\n")])
+    for (const [path, content] of snapshot) {
       const inFolder = path.startsWith(folder + "/")
-      const content = f.lines.join("\n")
+      if (inFolder && /\/index\.md$/i.test(path)) continue
+      if (path === this.cfg.inboxPath) continue
       for (const t of taskLines(content)) {
         const linked = t.id && (map[t.id] || gTasks.has(t.id))
         if (!inFolder && !hasTag(t.text, tag) && !linked) continue
@@ -269,11 +401,32 @@ export class TaskSync {
               })
               stats.updated++
             }
-            if (!SAME(merged, obs)) {
+            const moved = inFolder && listIdOfFile(path) !== g.listId
+            if (moved) {
+              // задачу перенесли в другой список — переносим строку в его заметку
+              setLine(path, t.line, null)
+              appendLine(
+                fileForList(g.listId),
+                formatTaskLine({
+                  done: merged.done,
+                  text: merged.title,
+                  due: merged.due,
+                  doneDate: merged.done
+                    ? (t.doneDate ?? fromGoogleDate(g.task.completed) ?? today)
+                    : null,
+                  id: t.id,
+                }),
+              )
+              stats.pulled++
+            } else if (!SAME(merged, obs)) {
               write(merged, t.id, g.task.completed)
               stats.pulled++
             }
-            next[t.id] = { listId: g.listId, base: merged }
+            next[t.id] = {
+              listId: g.listId,
+              base: merged,
+              path: moved ? fileForList(g.listId) : path,
+            }
           } else if (base && SAME(obs, base)) {
             // удалили в Google — удаляем строку
             setLine(path, t.line, null)
@@ -282,13 +435,13 @@ export class TaskSync {
             // в Google нет, а строку меняли — создаём заново
             const c = await createInGoogle(path, obs)
             write(obs, c.task.id)
-            next[c.task.id] = { listId: c.listId, base: obs }
+            next[c.task.id] = { listId: c.listId, base: obs, path }
           }
         } else {
           // новая задача (или копия уже связанной строки)
           const c = await createInGoogle(path, obs)
           write(obs, c.task.id)
-          next[c.task.id] = { listId: c.listId, base: obs }
+          next[c.task.id] = { listId: c.listId, base: obs, path }
         }
       }
     }
@@ -313,18 +466,9 @@ export class TaskSync {
     }
     for (const g of toImport) {
       const path = fileForList(g.listId)
-      if (!files.has(path)) {
-        files.set(path, {
-          lines: ["---", "tags: [задачи]", "---", ""],
-          changed: true,
-          created: true,
-        })
-      }
-      const f = files.get(path)
       const gf = gFields(g.task)
-      while (f.lines.length && f.lines[f.lines.length - 1] === "") f.lines.pop()
-      if (f.lines[f.lines.length - 1] === "---") f.lines.push("") // пустая строка после шапки
-      f.lines.push(
+      appendLine(
+        path,
         formatTaskLine({
           done: gf.done,
           text: gf.title,
@@ -332,10 +476,8 @@ export class TaskSync {
           doneDate: gf.done ? fromGoogleDate(g.task.completed) : null,
           id: g.task.id,
         }),
-        "",
       )
-      f.changed = true
-      next[g.task.id] = { listId: g.listId, base: gf }
+      next[g.task.id] = { listId: g.listId, base: gf, path }
       stats.imported++
     }
 

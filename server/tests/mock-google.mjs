@@ -25,6 +25,19 @@ export function startMockGoogle({ lists = [{ title: "Мои задачи" }] } =
       req.on("data", (c) => (s += c))
       req.on("end", () => r(s))
     })
+  // порядок задач: перенумеровываем position по текущему порядку в Map
+  const renumber = (list) => {
+    let i = 0
+    for (const t of list.values()) t.position = String(++i).padStart(20, "0")
+  }
+  const insertAfter = (list, task, previous) => {
+    const items = [...list.values()].filter((x) => x.id !== task.id)
+    const idx = previous ? items.findIndex((x) => x.id === previous) + 1 : 0
+    items.splice(idx, 0, task)
+    list.clear()
+    for (const x of items) list.set(x.id, x)
+    renumber(list)
+  }
   const stamp = (t) => {
     t.updated = new Date().toISOString()
     if (t.status === "completed" && !t.completed) t.completed = new Date().toISOString()
@@ -73,6 +86,19 @@ export function startMockGoogle({ lists = [{ title: "Мои задачи" }] } =
       state.tasks.set(l.id, new Map())
       return send(res, 200, l)
     }
+    const mv = /^\/tasks\/v1\/lists\/([^/]+)\/tasks\/([^/]+)\/move$/.exec(p)
+    if (mv && req.method === "POST") {
+      const from = state.tasks.get(decodeURIComponent(mv[1]))
+      const t = from?.get(decodeURIComponent(mv[2]))
+      if (!t) return send(res, 404, { error: { message: "task" } })
+      const dest = url.searchParams.get("destinationTasklist")
+      const to = dest ? state.tasks.get(dest) : from
+      if (!to) return send(res, 404, { error: { message: "list" } })
+      from.delete(t.id)
+      renumber(from)
+      insertAfter(to, t, url.searchParams.get("previous"))
+      return send(res, 200, t)
+    }
     const m = /^\/tasks\/v1\/lists\/([^/]+)\/tasks(?:\/([^/]+))?$/.exec(p)
     if (m) {
       const list = state.tasks.get(decodeURIComponent(m[1]))
@@ -81,7 +107,7 @@ export function startMockGoogle({ lists = [{ title: "Мои задачи" }] } =
       if (!id && req.method === "GET") return send(res, 200, { items: [...list.values()] })
       if (!id && req.method === "POST") {
         const t = stamp({ id: rid(), kind: "tasks#task", status: "needsAction", ...body })
-        list.set(t.id, t)
+        insertAfter(list, t, url.searchParams.get("previous"))
         return send(res, 200, t)
       }
       const t = list.get(id)
@@ -117,6 +143,7 @@ export function startMockGoogle({ lists = [{ title: "Мои задачи" }] } =
           const l = state.lists.find((x) => x.title === listTitle)
           const t = stamp({ id: rid(), status: "needsAction", ...task })
           state.tasks.get(l.id).set(t.id, t)
+          renumber(state.tasks.get(l.id))
           return t
         },
         edit(id, patch) {

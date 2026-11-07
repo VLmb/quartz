@@ -1,5 +1,5 @@
-// Редактор собирается в отдельный файл и грузится только по кнопке «Редактировать»,
-// чтобы не утяжелять обычные страницы (CodeMirror + marked ≈ 300 КБ).
+// Редактор и «пространства» (Задачи, Inbox) собираются в отдельные файлы и грузятся
+// только там, где нужны, чтобы не утяжелять обычные страницы.
 import { build } from "esbuild"
 import { createHash } from "crypto"
 import path from "path"
@@ -7,11 +7,11 @@ import { QuartzEmitterPlugin } from "../plugins/types"
 import { write } from "../plugins/emitters/helpers"
 import { FullSlug } from "../util/path"
 
-export const editorBundle = { file: "", code: "" }
+export const editorBundle = { file: "", code: "", spaces: "", spacesCode: "" }
 
-export async function buildEditorBundle() {
+async function bundle(entry: string): Promise<string> {
   const res = await build({
-    entryPoints: [path.resolve("quartz/console/editor/main.ts")],
+    entryPoints: [path.resolve(entry)],
     bundle: true,
     format: "esm",
     platform: "browser",
@@ -21,21 +21,33 @@ export async function buildEditorBundle() {
     charset: "utf8",
     legalComments: "none",
   })
-  const code = res.outputFiles[0].text
-  editorBundle.code = code
-  editorBundle.file = `static/editor-${createHash("sha256").update(code).digest("hex").slice(0, 8)}.js`
+  return res.outputFiles[0].text
+}
+
+const hashed = (name: string, code: string) =>
+  `static/${name}-${createHash("sha256").update(code).digest("hex").slice(0, 8)}.js`
+
+export async function buildEditorBundle() {
+  const [editor, spaces] = await Promise.all([
+    bundle("quartz/console/editor/main.ts"),
+    bundle("quartz/console/spaces/main.ts"),
+  ])
+  editorBundle.code = editor
+  editorBundle.file = hashed("editor", editor)
+  editorBundle.spacesCode = spaces
+  editorBundle.spaces = hashed("spaces", spaces)
 }
 
 export const EditorBundle: QuartzEmitterPlugin = () => ({
   name: "EditorBundle",
   async *emit(ctx) {
-    if (!editorBundle.file) return
-    yield write({
-      ctx,
-      slug: editorBundle.file.replace(/\.js$/, "") as FullSlug,
-      ext: ".js",
-      content: editorBundle.code,
-    })
+    for (const [file, content] of [
+      [editorBundle.file, editorBundle.code],
+      [editorBundle.spaces, editorBundle.spacesCode],
+    ]) {
+      if (!file) continue
+      yield write({ ctx, slug: file.replace(/\.js$/, "") as FullSlug, ext: ".js", content })
+    }
   },
   async *partialEmit() {},
 })

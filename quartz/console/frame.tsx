@@ -20,7 +20,7 @@ import {
   Sidebar,
   Toc,
 } from "./components"
-import { notes, pageKind, pathSegments, title } from "./data"
+import { notes, pageKind, pathSegments, spaceOfSlug, title } from "./data"
 import { QuartzPluginData } from "../plugins/vfile"
 import { editorBundle } from "./editorBundle"
 
@@ -51,7 +51,8 @@ export const ConsoleFrame: PageFrame = {
     footer,
   }: PageFrameProps) {
     const p = componentData
-    const kind = pageKind(p.fileData.slug)
+    const space = spaceOfSlug(p.fileData.slug)
+    const kind = space ? "space" : pageKind(p.fileData.slug)
     const isNote = kind === "note"
     const render = (list: QuartzComponent[]) => list.map((C) => <C {...p} />)
     const heading =
@@ -80,7 +81,14 @@ export const ConsoleFrame: PageFrame = {
         >
           <header class="topbar skin-l">{render(header)}</header>
           <CTabs {...p} />
-          {kind === "home" ? (
+          {space ? (
+            <div class="view space-view" data-space={space}>
+              <div class="space-root" data-space-root={space}></div>
+              <div class="space-fallback prose">
+                <Content {...p} />
+              </div>
+            </div>
+          ) : kind === "home" ? (
             <div class="view home">
               <Home {...p} />
               <section class="sec readme">
@@ -123,7 +131,11 @@ export const ConsoleFrame: PageFrame = {
         {render(footer)}
         <MobileTabs {...p} />
         <EditFab {...p} />
-        <span hidden data-editor-url={editorBundle.file}></span>
+        <span
+          hidden
+          data-editor-url={editorBundle.file}
+          data-spaces-url={editorBundle.spaces}
+        ></span>
         <div class="drawer-backdrop" data-drawer-backdrop></div>
         <Palette />
         <Settings />

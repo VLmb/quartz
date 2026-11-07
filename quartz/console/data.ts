@@ -27,8 +27,29 @@ export function isNote(f: QuartzPluginData): boolean {
   return pageKind(slug) === "note"
 }
 
+/* ───── пространства: «Задачи» и «Inbox» — не заметки базы знаний, у них свои страницы ───── */
+export const TASKS_FOLDER = "Задачи"
+export const INBOX_FILE = "Inbox.md"
+export const TASKS_SLUG = "задачи/index"
+export const INBOX_SLUG = "inbox"
+export type Space = "tasks" | "inbox"
+
+export function spaceOf(f: QuartzPluginData): Space | null {
+  const segs = pathSegments(f)
+  if (segs[0] === TASKS_FOLDER && segs.length > 1) return "tasks"
+  if (segs.length === 1 && segs[0] === INBOX_FILE) return "inbox"
+  return null
+}
+
+export function spaceOfSlug(slug: string | undefined): Space | null {
+  const s = (slug ?? "").toLowerCase()
+  if (s === INBOX_SLUG) return "inbox"
+  if (s === TASKS_SLUG || s === "задачи") return "tasks"
+  return null
+}
+
 export function notes(allFiles: QuartzPluginData[]): QuartzPluginData[] {
-  return allFiles.filter(isNote)
+  return allFiles.filter((f) => isNote(f) && !spaceOf(f))
 }
 
 export function title(f: QuartzPluginData): string {
